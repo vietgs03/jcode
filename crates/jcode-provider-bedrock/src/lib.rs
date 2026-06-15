@@ -439,7 +439,9 @@ impl BedrockProvider {
                                     "Current Bedrock model does not advertise image input support"
                                 )));
                             }
-                            match Self::image_block(media_type, data) {
+                            let (media_type, data) =
+                                jcode_image_clamp::clamp_base64_image(media_type, data);
+                            match Self::image_block(&media_type, &data) {
                                 Ok(image) => content.push(ContentBlock::Image(image)),
                                 Err(err) => return Some(Err(err)),
                             }

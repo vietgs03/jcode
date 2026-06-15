@@ -232,11 +232,17 @@ pub fn format_content_blocks(blocks: &[ContentBlock], is_oauth: bool) -> Vec<Api
                 });
             }
             ContentBlock::Image { media_type, data } => {
+                // Clamp oversized images so the request stays within Anthropic's
+                // per-image pixel limit (2000px/edge for many-image requests).
+                // This is what was 400ing resumed sessions: replaying >20 stored
+                // screenshots into one request trips the many-image cap.
+                let (media_type, data) =
+                    jcode_image_clamp::clamp_base64_image(media_type, data);
                 let img_block = ToolResultContentBlock::Image {
                     source: ApiImageSource {
                         kind: "base64".to_string(),
-                        media_type: media_type.clone(),
-                        data: data.clone(),
+                        media_type: media_type.clone().into_owned(),
+                        data: data.clone().into_owned(),
                     },
                 };
                 if let Some(ApiContentBlock::ToolResult { content, .. }) = result.last_mut() {
@@ -255,8 +261,8 @@ pub fn format_content_blocks(blocks: &[ContentBlock], is_oauth: bool) -> Vec<Api
                     result.push(ApiContentBlock::Image {
                         source: ApiImageSource {
                             kind: "base64".to_string(),
-                            media_type: media_type.clone(),
-                            data: data.clone(),
+                            media_type: media_type.into_owned(),
+                            data: data.into_owned(),
                         },
                     });
                 }
@@ -659,4 +665,92 @@ pub struct ApiTool {
     pub input_schema: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CacheControlParam>,
+}
+
+#[cfg(test)]
+mod image_clamp_tests {
+    use super::*;
+    use base64::Engine;
+    use base64::engine::general_purpose::STANDARD as BASE64;
+
+    fn oversized_png_base64(w: u32, h: u32) -> String {
+        let img = image::RgbaImage::from_pixel(w, h, image::Rgba([5, 90, 160, 255]));
+        let mut buf = Vec::new();
+        let mut cursor = std::io::Cursor::new(&mut buf);
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut cursor, image::ImageFormat::Png)
+            .unwrap();
+        BASE64.encode(&buf)
+    }
+
+    fn dims(b64: &str) -> (u32, u32) {
+        let bytes = BASE64.decode(b64).unwrap();
+        jcode_image_clamp::dimensions_from_bytes(&bytes).unwrap()
+    }
+
+    // Regression: resuming a session replayed >20 oversized screenshots into one
+    // request, and Anthropic 400'd because each image exceeded the 2000px
+    // many-image limit. format_content_blocks must downscale before sending.
+    #[test]
+    fn oversized_standalone_image_is_clamped() {
+        let data = oversized_png_base64(3000, 1500);
+        let blocks = vec![ContentBlock::Image {
+            media_type: "image/png".to_string(),
+            data,
+        }];
+        let out = format_content_blocks(&blocks, false);
+        assert_eq!(out.len(), 1);
+        let ApiContentBlock::Image { source } = &out[0] else {
+            panic!("expected standalone image block, got {out:?}", out = out.len());
+        };
+        let (w, h) = dims(&source.data);
+        assert!(w <= 2000 && h <= 2000, "image not clamped: {w}x{h}");
+    }
+
+    #[test]
+    fn oversized_image_inside_tool_result_is_clamped() {
+        let data = oversized_png_base64(4000, 2000);
+        let blocks = vec![
+            ContentBlock::ToolResult {
+                tool_use_id: "call_1".to_string(),
+                content: "screenshot".to_string(),
+                is_error: Some(false),
+            },
+            ContentBlock::Image {
+                media_type: "image/png".to_string(),
+                data,
+            },
+        ];
+        let out = format_content_blocks(&blocks, false);
+        let ApiContentBlock::ToolResult {
+            content: ToolResultContent::Blocks(inner),
+            ..
+        } = &out[0]
+        else {
+            panic!("expected tool_result with image blocks");
+        };
+        let img = inner
+            .iter()
+            .find_map(|b| match b {
+                ToolResultContentBlock::Image { source } => Some(source),
+                _ => None,
+            })
+            .expect("image block present");
+        let (w, h) = dims(&img.data);
+        assert!(w <= 2000 && h <= 2000, "tool_result image not clamped: {w}x{h}");
+    }
+
+    #[test]
+    fn small_image_passes_through_unchanged() {
+        let data = oversized_png_base64(640, 480);
+        let blocks = vec![ContentBlock::Image {
+            media_type: "image/png".to_string(),
+            data: data.clone(),
+        }];
+        let out = format_content_blocks(&blocks, false);
+        let ApiContentBlock::Image { source } = &out[0] else {
+            panic!("expected image block");
+        };
+        assert_eq!(source.data, data, "small image should be byte-identical");
+    }
 }

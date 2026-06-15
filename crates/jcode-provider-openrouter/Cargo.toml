@@ -11,6 +11,7 @@ anyhow = "1"
 bytes = "1"
 futures = "0.3"
 jcode-core = { path = "../jcode-core" }
+jcode-image-clamp = { path = "../jcode-image-clamp" }
 jcode-logging = { path = "../jcode-logging" }
 jcode-message-types = { path = "../jcode-message-types" }
 reqwest = { version = "0.12", default-features = false, features = ["stream"] }

@@ -3682,6 +3682,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jcode-image-clamp"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "image",
+ "jcode-logging",
+]
+
+[[package]]
 name = "jcode-import-core"
 version = "0.1.0"
 dependencies = [
@@ -3823,6 +3832,9 @@ dependencies = [
 name = "jcode-provider-anthropic"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "image",
+ "jcode-image-clamp",
  "jcode-logging",
  "jcode-message-types",
  "jcode-provider-core",
@@ -3857,6 +3869,7 @@ dependencies = [
  "chrono",
  "futures",
  "jcode-core",
+ "jcode-image-clamp",
  "jcode-logging",
  "jcode-message-types",
  "jcode-provider-core",
@@ -3911,6 +3924,7 @@ name = "jcode-provider-gemini"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "jcode-image-clamp",
  "jcode-message-types",
  "serde",
  "serde_json",
@@ -3932,6 +3946,7 @@ dependencies = [
  "bytes",
  "futures",
  "jcode-core",
+ "jcode-image-clamp",
  "jcode-logging",
  "jcode-message-types",
  "jcode-provider-core",
@@ -3950,6 +3965,7 @@ dependencies = [
  "dirs",
  "futures",
  "jcode-core",
+ "jcode-image-clamp",
  "jcode-logging",
  "jcode-message-types",
  "reqwest 0.12.28",

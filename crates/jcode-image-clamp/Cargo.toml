@@ -1,0 +1,18 @@
+[package]
+name = "jcode-image-clamp"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Clamp outbound image dimensions so vision requests stay within provider per-image limits (e.g. Anthropic's 2000px many-image cap)."
+
+[lib]
+name = "jcode_image_clamp"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }  # Only PNG/JPEG encode/decode (matches the rest of the workspace)
+jcode-logging = { path = "../jcode-logging" }
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
