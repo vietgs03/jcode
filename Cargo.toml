@@ -70,6 +70,7 @@ members = [
     "crates/jcode-update-core",
     "crates/jcode-terminal-launch",
     "crates/jcode-terminal-image",
+    "crates/jcode-image-clamp",
     "crates/jcode-telemetry-core",
     "crates/jcode-tui-workspace",
     "crates/jcode-mobile-core",

@@ -334,10 +334,12 @@ pub fn build_contents(messages: &[Message]) -> Vec<GeminiContent> {
                         });
                     }
                     ContentBlock::Image { media_type, data } => {
+                        let (media_type, data) =
+                            jcode_image_clamp::clamp_base64_image(media_type, data);
                         parts.push(GeminiPart {
                             inline_data: Some(InlineData {
-                                mime_type: media_type.clone(),
-                                data: data.clone(),
+                                mime_type: media_type.into_owned(),
+                                data: data.into_owned(),
                             }),
                             ..Default::default()
                         });

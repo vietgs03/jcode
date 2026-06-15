@@ -133,6 +133,8 @@ pub fn build_responses_input_with_logger(
                 for block in &msg.content {
                     match block {
                         ContentBlock::Image { media_type, data } => {
+                            let (media_type, data) =
+                                jcode_image_clamp::clamp_base64_image(media_type, data);
                             content_parts.push(serde_json::json!({
                                 "type": "input_image",
                                 "image_url": format!("data:{};base64,{}", media_type, data)

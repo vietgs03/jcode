@@ -83,6 +83,8 @@ pub fn build_chat_messages(
                         }
                         ContentBlock::Image { media_type, data } => {
                             if allow_image_input {
+                                let (media_type, data) =
+                                    jcode_image_clamp::clamp_base64_image(media_type, data);
                                 pending_user_parts.push(serde_json::json!({
                                     "type": "image_url",
                                     "image_url": {
