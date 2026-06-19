@@ -542,16 +542,16 @@ const DESKTOP_NO_PAINT_BUDGET: Duration = Duration::from_millis(250);
 const DESKTOP_FRAME_PROFILE_REPORT_INTERVAL: Duration = Duration::from_secs(1);
 
 const CLEAR_COLOR: wgpu::Color = wgpu::Color {
-    r: 0.955,
-    g: 0.965,
-    b: 0.985,
+    r: 0.094,
+    g: 0.094,
+    b: 0.125,
     a: 1.0,
 };
 
-const BACKGROUND_TOP_LEFT: [f32; 4] = [0.890, 0.930, 1.000, 1.0];
-const BACKGROUND_TOP_RIGHT: [f32; 4] = [0.960, 0.910, 1.000, 1.0];
-const BACKGROUND_BOTTOM_RIGHT: [f32; 4] = [0.875, 0.980, 0.930, 1.0];
-const BACKGROUND_BOTTOM_LEFT: [f32; 4] = [0.945, 0.960, 0.995, 1.0];
+const BACKGROUND_TOP_LEFT: [f32; 4] = [0.106, 0.106, 0.149, 1.0];
+const BACKGROUND_TOP_RIGHT: [f32; 4] = [0.118, 0.114, 0.165, 1.0];
+const BACKGROUND_BOTTOM_RIGHT: [f32; 4] = [0.090, 0.094, 0.133, 1.0];
+const BACKGROUND_BOTTOM_LEFT: [f32; 4] = [0.098, 0.102, 0.145, 1.0];
 const FOCUS_RING_COLOR: [f32; 4] = [0.135, 0.155, 0.205, 0.90];
 const NAV_STATUS_COLOR: [f32; 4] = [0.145, 0.165, 0.220, 1.0];
 const INSERT_STATUS_COLOR: [f32; 4] = [0.245, 0.395, 0.340, 1.0];
@@ -560,41 +560,41 @@ const STATUS_PREVIEW_EMPTY_FOCUSED_COLOR: [f32; 4] = [0.953, 0.965, 0.984, 0.50]
 const STATUS_PREVIEW_VIEWPORT_COLOR: [f32; 4] = [0.953, 0.965, 0.984, 0.78];
 const WORKSPACE_NUMBER_COLOR: [f32; 4] = [0.953, 0.965, 0.984, 0.90];
 const STATUS_TEXT_COLOR: [f32; 4] = [0.953, 0.965, 0.984, 0.88];
-const PANEL_TITLE_COLOR: [f32; 4] = [0.010, 0.014, 0.025, 1.0];
-const PANEL_BODY_COLOR: [f32; 4] = [0.008, 0.012, 0.020, 1.0];
-const ASSISTANT_TEXT_COLOR: [f32; 4] = [0.026, 0.034, 0.052, 1.0];
-const ASSISTANT_HEADING_TEXT_COLOR: [f32; 4] = [0.030, 0.095, 0.300, 1.0];
-const ASSISTANT_QUOTE_TEXT_COLOR: [f32; 4] = [0.210, 0.090, 0.355, 1.0];
-const ASSISTANT_TABLE_TEXT_COLOR: [f32; 4] = [0.000, 0.155, 0.185, 1.0];
-const ASSISTANT_LINK_TEXT_COLOR: [f32; 4] = [0.000, 0.170, 0.430, 1.0];
-const USER_TEXT_COLOR: [f32; 4] = [0.012, 0.030, 0.180, 1.0];
-const USER_CONTINUATION_TEXT_COLOR: [f32; 4] = [0.018, 0.035, 0.155, 1.0];
-const TOOL_TEXT_COLOR: [f32; 4] = [0.150, 0.095, 0.325, 1.0];
-const TOOL_DETAIL_TEXT_COLOR: [f32; 4] = [0.135, 0.155, 0.220, 1.0];
-const TOOL_MUTED_TEXT_COLOR: [f32; 4] = [0.345, 0.365, 0.430, 0.96];
-const TOOL_RUNNING_TEXT_COLOR: [f32; 4] = [0.045, 0.265, 0.640, 1.0];
-const TOOL_SUCCESS_TEXT_COLOR: [f32; 4] = [0.035, 0.360, 0.220, 1.0];
-const TOOL_FAILED_TEXT_COLOR: [f32; 4] = [0.560, 0.070, 0.095, 1.0];
-const TOOL_PENDING_TEXT_COLOR: [f32; 4] = [0.320, 0.345, 0.405, 1.0];
-const TOOL_CARD_BACKGROUND_COLOR: [f32; 4] = [0.985, 0.990, 1.000, 0.68];
-const TOOL_CARD_ACTIVE_BACKGROUND_COLOR: [f32; 4] = [0.890, 0.945, 1.000, 0.72];
-const TOOL_CARD_SUCCESS_BACKGROUND_COLOR: [f32; 4] = [0.875, 0.975, 0.925, 0.56];
-const TOOL_CARD_FAILED_BACKGROUND_COLOR: [f32; 4] = [1.000, 0.900, 0.910, 0.64];
-const TOOL_CARD_GROUP_BACKGROUND_COLOR: [f32; 4] = [0.945, 0.930, 1.000, 0.50];
-const TOOL_CARD_BORDER_COLOR: [f32; 4] = [0.105, 0.165, 0.295, 0.22];
-const TOOL_CARD_ACTIVE_BORDER_COLOR: [f32; 4] = [0.000, 0.260, 0.720, 0.36];
-const TOOL_TIMELINE_RAIL_COLOR: [f32; 4] = [0.105, 0.165, 0.295, 0.20];
-const TOOL_TIMELINE_ACTIVE_RAIL_COLOR: [f32; 4] = [0.000, 0.260, 0.720, 0.46];
-const TOOL_OUTPUT_DRAWER_COLOR: [f32; 4] = [0.030, 0.055, 0.095, 0.070];
-const TOOL_STATUS_CHIP_COLOR: [f32; 4] = [1.000, 1.000, 1.000, 0.42];
-const META_TEXT_COLOR: [f32; 4] = [0.095, 0.110, 0.155, 0.98];
-const CODE_TEXT_COLOR: [f32; 4] = [0.055, 0.065, 0.095, 1.0];
-const STATUS_TEXT_ACCENT_COLOR: [f32; 4] = [0.030, 0.125, 0.080, 1.0];
-const ERROR_TEXT_COLOR: [f32; 4] = [0.360, 0.000, 0.000, 1.0];
-const OVERLAY_TEXT_COLOR: [f32; 4] = [0.030, 0.045, 0.075, 1.0];
-const OVERLAY_SELECTION_TEXT_COLOR: [f32; 4] = [0.010, 0.035, 0.105, 1.0];
-const USER_PROMPT_ACCENT_COLOR: [f32; 4] = [0.000, 0.105, 0.250, 1.0];
-const PANEL_SECTION_COLOR: [f32; 4] = [0.045, 0.055, 0.080, 0.95];
+const PANEL_TITLE_COLOR: [f32; 4] = [0.953, 0.957, 0.973, 1.0];
+const PANEL_BODY_COLOR: [f32; 4] = [0.808, 0.820, 0.875, 1.0];
+const ASSISTANT_TEXT_COLOR: [f32; 4] = [0.871, 0.882, 0.937, 1.0];
+const ASSISTANT_HEADING_TEXT_COLOR: [f32; 4] = [0.667, 0.733, 1.000, 1.0];
+const ASSISTANT_QUOTE_TEXT_COLOR: [f32; 4] = [0.804, 0.722, 1.000, 1.0];
+const ASSISTANT_TABLE_TEXT_COLOR: [f32; 4] = [0.580, 0.886, 0.835, 1.0];
+const ASSISTANT_LINK_TEXT_COLOR: [f32; 4] = [0.537, 0.706, 0.980, 1.0];
+const USER_TEXT_COLOR: [f32; 4] = [0.847, 0.886, 1.000, 1.0];
+const USER_CONTINUATION_TEXT_COLOR: [f32; 4] = [0.808, 0.847, 0.973, 1.0];
+const TOOL_TEXT_COLOR: [f32; 4] = [0.804, 0.745, 1.000, 1.0];
+const TOOL_DETAIL_TEXT_COLOR: [f32; 4] = [0.733, 0.749, 0.820, 1.0];
+const TOOL_MUTED_TEXT_COLOR: [f32; 4] = [0.541, 0.557, 0.643, 0.96];
+const TOOL_RUNNING_TEXT_COLOR: [f32; 4] = [0.537, 0.706, 0.980, 1.0];
+const TOOL_SUCCESS_TEXT_COLOR: [f32; 4] = [0.392, 0.871, 0.502, 1.0];
+const TOOL_FAILED_TEXT_COLOR: [f32; 4] = [0.973, 0.443, 0.443, 1.0];
+const TOOL_PENDING_TEXT_COLOR: [f32; 4] = [0.498, 0.514, 0.604, 1.0];
+const TOOL_CARD_BACKGROUND_COLOR: [f32; 4] = [0.118, 0.118, 0.165, 0.85];
+const TOOL_CARD_ACTIVE_BACKGROUND_COLOR: [f32; 4] = [0.145, 0.165, 0.255, 0.90];
+const TOOL_CARD_SUCCESS_BACKGROUND_COLOR: [f32; 4] = [0.110, 0.180, 0.145, 0.80];
+const TOOL_CARD_FAILED_BACKGROUND_COLOR: [f32; 4] = [0.220, 0.110, 0.125, 0.80];
+const TOOL_CARD_GROUP_BACKGROUND_COLOR: [f32; 4] = [0.145, 0.135, 0.200, 0.70];
+const TOOL_CARD_BORDER_COLOR: [f32; 4] = [0.400, 0.420, 0.560, 0.30];
+const TOOL_CARD_ACTIVE_BORDER_COLOR: [f32; 4] = [0.486, 0.424, 1.000, 0.55];
+const TOOL_TIMELINE_RAIL_COLOR: [f32; 4] = [0.400, 0.420, 0.560, 0.28];
+const TOOL_TIMELINE_ACTIVE_RAIL_COLOR: [f32; 4] = [0.486, 0.424, 1.000, 0.60];
+const TOOL_OUTPUT_DRAWER_COLOR: [f32; 4] = [0.063, 0.063, 0.090, 0.55];
+const TOOL_STATUS_CHIP_COLOR: [f32; 4] = [0.255, 0.267, 0.353, 0.55];
+const META_TEXT_COLOR: [f32; 4] = [0.604, 0.620, 0.706, 0.98];
+const CODE_TEXT_COLOR: [f32; 4] = [0.831, 0.843, 0.902, 1.0];
+const STATUS_TEXT_ACCENT_COLOR: [f32; 4] = [0.392, 0.871, 0.502, 1.0];
+const ERROR_TEXT_COLOR: [f32; 4] = [0.973, 0.443, 0.443, 1.0];
+const OVERLAY_TEXT_COLOR: [f32; 4] = [0.871, 0.882, 0.937, 1.0];
+const OVERLAY_SELECTION_TEXT_COLOR: [f32; 4] = [0.953, 0.965, 1.000, 1.0];
+const USER_PROMPT_ACCENT_COLOR: [f32; 4] = [0.486, 0.624, 1.000, 1.0];
+const PANEL_SECTION_COLOR: [f32; 4] = [0.706, 0.722, 0.808, 0.95];
 const SELECTION_HIGHLIGHT_COLOR: [f32; 4] = [0.220, 0.420, 0.700, 0.22];
 const WELCOME_AURORA_BLUE: [f32; 4] = [0.250, 0.520, 1.000, 0.145];
 const WELCOME_AURORA_VIOLET: [f32; 4] = [0.720, 0.360, 0.980, 0.125];
@@ -602,11 +602,11 @@ const WELCOME_AURORA_MINT: [f32; 4] = [0.220, 0.840, 0.660, 0.115];
 const WELCOME_AURORA_WARM: [f32; 4] = [1.000, 0.620, 0.360, 0.075];
 const WELCOME_HANDWRITING_COLOR: [f32; 4] = [0.012, 0.080, 0.250, 0.94];
 const NATIVE_SPINNER_HEAD_COLOR: [f32; 4] = [0.000, 0.260, 0.720, 1.0];
-const CODE_BLOCK_BACKGROUND_COLOR: [f32; 4] = [0.075, 0.095, 0.135, 0.105];
-const INLINE_CODE_BACKGROUND_COLOR: [f32; 4] = [0.075, 0.095, 0.135, 0.175];
-const QUOTE_CARD_BACKGROUND_COLOR: [f32; 4] = [0.520, 0.330, 0.760, 0.090];
-const TABLE_CARD_BACKGROUND_COLOR: [f32; 4] = [0.080, 0.460, 0.520, 0.085];
-const ERROR_CARD_BACKGROUND_COLOR: [f32; 4] = [0.850, 0.170, 0.170, 0.105];
+const CODE_BLOCK_BACKGROUND_COLOR: [f32; 4] = [0.043, 0.043, 0.063, 0.90];
+const INLINE_CODE_BACKGROUND_COLOR: [f32; 4] = [0.255, 0.267, 0.353, 0.45];
+const QUOTE_CARD_BACKGROUND_COLOR: [f32; 4] = [0.486, 0.424, 1.000, 0.12];
+const TABLE_CARD_BACKGROUND_COLOR: [f32; 4] = [0.220, 0.500, 0.560, 0.12];
+const ERROR_CARD_BACKGROUND_COLOR: [f32; 4] = [0.700, 0.250, 0.250, 0.16];
 const OVERLAY_SELECTION_BACKGROUND_COLOR: [f32; 4] = [0.280, 0.470, 0.780, 0.115];
 const STATUS_PREVIEW_ACCENTS: [[f32; 3]; 8] = [
     [0.560, 0.690, 0.980],
@@ -6527,6 +6527,12 @@ fn benchmark_font_system() -> FontSystem {
 
 fn create_desktop_font_system() -> FontSystem {
     let mut font_system = FontSystem::new();
+    font_system
+        .db_mut()
+        .load_font_data(include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf").to_vec());
+    font_system
+        .db_mut()
+        .load_font_data(include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Bold.ttf").to_vec());
     font_system
         .db_mut()
         .load_font_data(include_bytes!("../assets/fonts/Kalam-Regular.ttf").to_vec());

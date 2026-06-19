@@ -19,9 +19,9 @@ use std::time::{Duration, Instant, SystemTime};
 use workspace::{KeyInput, KeyOutcome, SessionTranscriptMessage};
 
 pub(crate) const SINGLE_SESSION_FONT_FAMILY: &str = "JetBrainsMono Nerd Font";
-pub(crate) const SINGLE_SESSION_USER_FONT_FAMILY: &str = "Kalam";
+pub(crate) const SINGLE_SESSION_USER_FONT_FAMILY: &str = SINGLE_SESSION_FONT_FAMILY;
 pub(crate) const SINGLE_SESSION_ASSISTANT_FONT_FAMILY: &str = SINGLE_SESSION_FONT_FAMILY;
-pub(crate) const SINGLE_SESSION_WELCOME_FONT_FAMILY: &str = "Homemade Apple";
+pub(crate) const SINGLE_SESSION_WELCOME_FONT_FAMILY: &str = SINGLE_SESSION_FONT_FAMILY;
 pub(crate) const SINGLE_SESSION_FONT_WEIGHT: &str = "Light";
 pub(crate) const SINGLE_SESSION_FONT_FALLBACKS: &[&str] = &[
     "JetBrainsMono Nerd Font Mono",
