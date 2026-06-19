@@ -5072,10 +5072,10 @@ fn assistant_inline_code_uses_code_text_attrs_inside_prose() {
         ))
     );
     assert!(
-        !segments
+        segments
             .iter()
-            .any(|(_, attrs)| attrs.family == Family::Name(SINGLE_SESSION_USER_FONT_FAMILY)),
-        "inline-code lines should avoid mixing handwriting and mono fonts: {segments:?}"
+            .all(|(_, attrs)| attrs.family == Family::Name(SINGLE_SESSION_FONT_FAMILY)),
+        "inline-code and prose now share the unified mono font family: {segments:?}"
     );
     assert!(!segments.iter().any(|(text, _)| text.contains('`')));
     for code_segment in ["cargo test", "cargo clippy"] {
