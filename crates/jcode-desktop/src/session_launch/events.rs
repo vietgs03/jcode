@@ -79,14 +79,17 @@ pub(super) fn desktop_event_from_server_value(value: &Value) -> Option<DesktopSe
                 })
         }
         "tool_done" => value.get("name").and_then(Value::as_str).map(|name| {
+            let raw_output = value.get("output").and_then(Value::as_str);
             DesktopSessionEvent::ToolFinished {
                 id: optional_server_str(value, "id").map(ToOwned::to_owned),
                 name: name.to_string(),
-                summary: value
-                    .get("output")
-                    .and_then(Value::as_str)
+                summary: raw_output
                     .map(compact_tool_output)
                     .unwrap_or_else(|| "done".to_string()),
+                output: raw_output
+                    .map(str::trim)
+                    .filter(|output| !output.is_empty())
+                    .map(ToOwned::to_owned),
                 is_error: value.get("error").is_some_and(|error| !error.is_null()),
             }
         }),

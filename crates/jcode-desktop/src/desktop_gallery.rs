@@ -99,21 +99,29 @@ pub(super) fn temporary_app(state: &str) -> DesktopApp {
                 .push(SingleSessionMessage::user("Show a successful tool."));
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolStarted {
                 id: Some("gallery-success".to_string()),
-                name: "agentgrep".to_string(),
+                name: "bash".to_string(),
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolExecuting {
                 id: Some("gallery-success".to_string()),
-                name: "agentgrep".to_string(),
+                name: "bash".to_string(),
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
                 id: Some("gallery-success".to_string()),
-                delta: r#"{"query":"DesktopSessionEvent","path":"crates/jcode-desktop/src"}"#
+                delta: r#"{"command":"git status --short && cargo build -p jcode-desktop"}"#
                     .to_string(),
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolFinished {
                 id: Some("gallery-success".to_string()),
-                name: "agentgrep".to_string(),
-                summary: "matched 42 regions".to_string(),
+                name: "bash".to_string(),
+                summary: "build finished in 28.8s".to_string(),
+                output: Some(
+                    " M crates/jcode-desktop/src/main.rs\n\
+                     ?? crates/jcode-desktop/IDE_BUILD_PLAN.md\n\
+                        Compiling jcode-desktop v0.1.0\n\
+                         Finished `dev` profile [unoptimized] target(s) in 28.81s\n\
+                     Exit code: 0"
+                        .to_string(),
+                ),
                 is_error: false,
             });
         }
@@ -128,10 +136,22 @@ pub(super) fn temporary_app(state: &str) -> DesktopApp {
                 id: Some("gallery-failed".to_string()),
                 name: "bash".to_string(),
             });
+            app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
+                id: Some("gallery-failed".to_string()),
+                delta: r#"{"command":"cargo test -p jcode-desktop"}"#.to_string(),
+            });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolFinished {
                 id: Some("gallery-failed".to_string()),
                 name: "bash".to_string(),
                 summary: "exit code 101: compile error".to_string(),
+                output: Some(
+                    "   Compiling jcode-desktop v0.1.0\n\
+                     error[E0425]: cannot find value `tool_run` in this scope\n\
+                       --> src/single_session.rs:8634:9\n\
+                     error: aborting due to 1 previous error\n\
+                     Exit code: 101"
+                        .to_string(),
+                ),
                 is_error: true,
             });
         }

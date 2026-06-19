@@ -1823,6 +1823,50 @@ fn single_session_typography_targets_jetbrains_mono_light_nerd() {
 }
 
 #[test]
+fn tool_output_body_lines_renders_full_bash_output() {
+    // A bash command with multi-line output should produce an indented body of
+    // those output lines (terminal-style), not just the one-line summary.
+    let body = tool_output_body_lines(
+        "bash",
+        Some("line one\nline two\nExit code: 0"),
+        "line one",
+    );
+    assert_eq!(
+        body,
+        vec![
+            "  line one".to_string(),
+            "  line two".to_string(),
+            "  Exit code: 0".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn tool_output_body_lines_truncates_long_output_from_the_top() {
+    let output: String = (1..=20)
+        .map(|n| format!("row {n}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let body = tool_output_body_lines("bash", Some(&output), "row 1");
+    // First line announces how many lines were elided above the visible tail.
+    assert!(body[0].contains("more line(s) above"), "{body:?}");
+    // The tail (most recent / most informative lines) is preserved.
+    assert!(body.last().unwrap().ends_with("row 20"), "{body:?}");
+    // Body is capped (truncation marker + at most MAX visible lines).
+    assert!(body.len() <= 15, "body too long: {}", body.len());
+}
+
+#[test]
+fn tool_output_body_lines_hides_noise_and_redundant_output() {
+    // Noise tools with single-line output stay collapsed.
+    assert!(tool_output_body_lines("read", Some("loaded 10 lines"), "loaded 10 lines").is_empty());
+    // No output at all -> no body.
+    assert!(tool_output_body_lines("bash", None, "done").is_empty());
+    // Single output line identical to the summary -> no duplicate body.
+    assert!(tool_output_body_lines("bash", Some("ok"), "ok").is_empty());
+}
+
+#[test]
 fn single_session_vertices_include_a_draft_caret() {
     let mut app = SingleSessionApp::new(None);
     let empty_vertices = build_single_session_vertices(&app, PhysicalSize::new(640, 480), 0.0, 0);
@@ -6313,6 +6357,7 @@ fn single_session_tool_events_expand_context_and_collapse_previous_call() {
         id: None,
         name: "bash".to_string(),
         summary: "tests passed".to_string(),
+        output: None,
         is_error: false,
     });
 
@@ -6385,6 +6430,7 @@ fn single_session_tool_ids_drive_stable_native_card_runs() {
         id: Some("tool-a".to_string()),
         name: "bash".to_string(),
         summary: "printed a".to_string(),
+        output: None,
         is_error: false,
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::ToolStarted {
@@ -6441,6 +6487,7 @@ fn single_session_tool_cards_have_native_geometry_and_success_fill() {
         id: Some("tool-card".to_string()),
         name: "bash".to_string(),
         summary: "check passed".to_string(),
+        output: None,
         is_error: false,
     });
 
@@ -6480,6 +6527,7 @@ fn single_session_tool_event_preserves_prior_streaming_text_order() {
         id: None,
         name: "bash".to_string(),
         summary: "done".to_string(),
+        output: None,
         is_error: false,
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::TextDelta(

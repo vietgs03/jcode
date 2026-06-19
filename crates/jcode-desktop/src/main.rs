@@ -3246,6 +3246,7 @@ fn run_headless_chat_smoke(message: String) -> Result<()> {
                 name,
                 summary,
                 is_error,
+                ..
             } => {
                 last_status = Some(if is_error {
                     format!("tool {name} failed")
@@ -5165,6 +5166,7 @@ fn run_scroll_render_benchmark(frames: usize) -> Result<()> {
             id,
             name: "bash".to_string(),
             summary: format!("output line for tool card {index}\n"),
+            output: None,
             is_error: false,
         });
     }
@@ -7049,14 +7051,19 @@ fn desktop_wire_session_event_to_runtime_event(
                 name: title,
             })
         }
-        DesktopSessionEventWire::ToolFinished { id, title, success } => {
-            Some(session_launch::DesktopSessionEvent::ToolFinished {
-                id: (!id.is_empty()).then_some(id),
-                name: title,
-                summary: String::new(),
-                is_error: !success,
-            })
-        }
+        DesktopSessionEventWire::ToolFinished {
+            id,
+            title,
+            success,
+            summary,
+            output,
+        } => Some(session_launch::DesktopSessionEvent::ToolFinished {
+            id: (!id.is_empty()).then_some(id),
+            name: title,
+            summary,
+            output,
+            is_error: !success,
+        }),
         DesktopSessionEventWire::Error { message } => {
             Some(session_launch::DesktopSessionEvent::Error(message))
         }
@@ -7985,11 +7992,17 @@ fn desktop_session_event_to_wire(
             }
         }
         session_launch::DesktopSessionEvent::ToolFinished {
-            id, name, is_error, ..
+            id,
+            name,
+            summary,
+            output,
+            is_error,
         } => DesktopSessionEventWire::ToolFinished {
             id: id.clone().unwrap_or_default(),
             title: name.clone(),
             success: !*is_error,
+            summary: summary.clone(),
+            output: output.clone(),
         },
         session_launch::DesktopSessionEvent::Error(message) => DesktopSessionEventWire::Error {
             message: message.clone(),
@@ -8851,6 +8864,7 @@ fn log_desktop_session_event_error(event: &session_launch::DesktopSessionEvent) 
             name,
             summary,
             is_error: true,
+            ..
         } => {
             desktop_log::warn(format_args!(
                 "jcode-desktop: tool failed name={} summary={}",

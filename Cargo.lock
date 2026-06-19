@@ -3653,6 +3653,7 @@ dependencies = [
  "glyphon",
  "image",
  "jcode-tui-messages",
+ "jcode-tui-tool-display",
  "libc",
  "pollster",
  "pulldown-cmark",

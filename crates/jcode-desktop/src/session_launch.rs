@@ -263,6 +263,10 @@ pub enum DesktopSessionEvent {
         id: Option<String>,
         name: String,
         summary: String,
+        /// Full tool output (stdout/stderr for bash, etc.). Preserved verbatim
+        /// so the desktop can render it as a terminal-style body instead of the
+        /// one-line `summary`. `None` when the backend sent no output.
+        output: Option<String>,
         is_error: bool,
     },
     ModelChanged {

@@ -13,6 +13,7 @@ bytemuck = { version = "1", features = ["derive"] }
 glyphon = "0.5"
 image = { version = "0.25", default-features = false, features = ["png"] }
 jcode-tui-messages = { path = "../jcode-tui-messages" }
+jcode-tui-tool-display = { path = "../jcode-tui-tool-display" }
 libc = "0.2"
 pollster = "0.3"
 pulldown-cmark = "0.12"

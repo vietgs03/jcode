@@ -95,6 +95,7 @@ fn desktop_event_parser_maps_streaming_server_events() {
             id: Some("tool-1".to_string()),
             name: "bash".to_string(),
             summary: "hello".to_string(),
+            output: Some("hello\nworld".to_string()),
             is_error: false
         })
     );
@@ -108,6 +109,7 @@ fn desktop_event_parser_maps_streaming_server_events() {
             id: None,
             name: "bash".to_string(),
             summary: "hello".to_string(),
+            output: Some("hello\nworld".to_string()),
             is_error: false
         })
     );

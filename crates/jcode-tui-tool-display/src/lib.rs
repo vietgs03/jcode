@@ -36,7 +36,7 @@ pub fn is_edit_tool_name(name: &str) -> bool {
     )
 }
 
-fn parse_nonzero_exit_code_line(line: &str) -> bool {
+pub fn parse_nonzero_exit_code_line(line: &str) -> bool {
     let trimmed = line.trim();
     if let Some(rest) = trimmed.strip_prefix("Exit code:") {
         return rest

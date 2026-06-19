@@ -4310,6 +4310,7 @@ impl SingleSessionApp {
                 id,
                 name,
                 summary,
+                output,
                 is_error,
             } => {
                 self.runtime.reload_phase = ReloadPhase::Stable;
@@ -4319,7 +4320,13 @@ impl SingleSessionApp {
                     is_error,
                 });
                 let marker = if is_error { "failed" } else { "done" };
-                let line = format!("▾ {name} {marker}: {summary}");
+                let mut line = format!("▾ {name} {marker}: {summary}");
+                // Append the full tool output as terminal-style body lines so the
+                // card reads like a real terminal block instead of a one-liner.
+                for body_line in tool_output_body_lines(&name, output.as_deref(), &summary) {
+                    line.push('\n');
+                    line.push_str(&body_line);
+                }
                 let finished_call_id = self.update_tool_run_state(
                     id,
                     &name,
@@ -9185,6 +9192,57 @@ fn compact_tool_text(text: &str, max_chars: usize) -> String {
 fn normalized_tool_call_id(id: Option<String>) -> Option<String> {
     id.map(|id| id.trim().to_string())
         .filter(|id| !id.is_empty())
+}
+
+/// Tools whose output is usually noise (a short status line is enough). For
+/// these we keep the compact one-line summary and do not expand a body.
+fn tool_is_noise_when_short(display_name: &str) -> bool {
+    matches!(display_name, "read" | "glob" | "grep" | "todo" | "ls")
+}
+
+/// Maximum number of output lines rendered in a finished tool card body before
+/// we truncate with an "N more lines" affordance.
+const TOOL_OUTPUT_BODY_MAX_LINES: usize = 14;
+
+/// Build the terminal-style body lines for a finished tool, from its full
+/// output. Returns an empty vec when there is nothing worth showing (so the
+/// card stays a one-liner). The leading two spaces keep alignment with the
+/// existing tool-widget indentation convention.
+pub(crate) fn tool_output_body_lines(name: &str, output: Option<&str>, summary: &str) -> Vec<String> {
+    let display_name = jcode_tui_tool_display::resolve_display_tool_name(name);
+    let Some(output) = output.map(str::trim).filter(|out| !out.is_empty()) else {
+        return Vec::new();
+    };
+
+    let all_lines: Vec<&str> = output.lines().collect();
+
+    // For noise tools, only surface a body when the output is genuinely
+    // multi-line and not already captured by the summary.
+    if tool_is_noise_when_short(display_name)
+        && (all_lines.len() <= 1 || output == summary)
+    {
+        return Vec::new();
+    }
+
+    // Avoid duplicating a single-line output that the summary already shows.
+    if all_lines.len() == 1 && all_lines[0].trim() == summary.trim() {
+        return Vec::new();
+    }
+
+    let total = all_lines.len();
+    let mut body: Vec<String> = Vec::new();
+    let shown = total.min(TOOL_OUTPUT_BODY_MAX_LINES);
+    // Show the last `shown` lines: tool tails (exit codes, results) are the most
+    // informative part of long command output.
+    let start = total.saturating_sub(shown);
+    if start > 0 {
+        body.push(format!("  … {start} more line(s) above"));
+    }
+    for line in &all_lines[start..] {
+        // Preserve content; trim only trailing whitespace so layout stays clean.
+        body.push(format!("  {}", line.trim_end()));
+    }
+    body
 }
 
 fn merge_tool_finish_with_existing_context(existing: &str, finish_line: &str) -> String {

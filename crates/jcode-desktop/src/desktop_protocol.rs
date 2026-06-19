@@ -100,6 +100,10 @@ pub(crate) enum DesktopSessionEventWire {
         id: String,
         title: String,
         success: bool,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        summary: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
     },
     Error {
         message: String,
