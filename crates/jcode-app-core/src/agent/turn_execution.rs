@@ -65,19 +65,32 @@ impl Agent {
             .into_iter()
             .map(|(media_type, data)| ContentBlock::Image { media_type, data })
             .collect();
-        blocks.push(ContentBlock::Text {
-            text: user_message.to_string(),
-            cache_control: None,
-        });
+        // Continuation turns (e.g. todo-gate reminders) arrive with empty text
+        // and the real payload in `system_reminder`. Persisting the empty text
+        // as a user turn pollutes the transcript with blank user messages that
+        // the model misreads as the user sending empty input (observed live:
+        // the model repeatedly answered "waiting for your message"). Mirror the
+        // local-mode `has_combined` guard and skip the empty text block.
+        if !user_message.trim().is_empty() {
+            blocks.push(ContentBlock::Text {
+                text: user_message.to_string(),
+                cache_control: None,
+            });
+        }
 
-        if blocks.len() > 1 {
+        if blocks.iter().any(|block| matches!(block, ContentBlock::Image { .. })) {
             crate::logging::info(&format!(
                 "Agent received message with {} image(s)",
-                blocks.len() - 1
+                blocks
+                    .iter()
+                    .filter(|block| matches!(block, ContentBlock::Image { .. }))
+                    .count()
             ));
         }
 
-        self.add_message(Role::User, blocks);
+        if !blocks.is_empty() {
+            self.add_message(Role::User, blocks);
+        }
         crate::telemetry::record_turn();
         self.session.save()?;
         let turn_started_at = Instant::now();
