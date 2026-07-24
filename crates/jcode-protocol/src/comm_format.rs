@@ -518,10 +518,11 @@ pub fn format_comm_context_history(target: &str, messages: &[HistoryMessage]) ->
             messages.len()
         );
         for msg in messages {
-            let truncated = if msg.content.len() > 500 {
-                format!("{}...", &msg.content[..500])
-            } else {
-                msg.content.clone()
+            // Truncate on a char boundary: byte-slicing multibyte text (e.g.
+            // Vietnamese) at a fixed index panics inside a code point.
+            let truncated = match msg.content.char_indices().nth(500) {
+                Some((byte_idx, _)) => format!("{}...", &msg.content[..byte_idx]),
+                None => msg.content.clone(),
             };
             output.push_str(&format!("[{}] {}\n\n", msg.role, truncated));
         }
@@ -642,5 +643,40 @@ pub fn format_comm_channels(channels: &[SwarmChannelInfo]) -> String {
             ));
         }
         output
+    }
+}
+
+#[cfg(test)]
+mod comm_format_truncation_tests {
+    use super::*;
+
+    #[test]
+    fn context_history_truncates_multibyte_content_without_panicking() {
+        // 600 Vietnamese chars: byte index 500 falls inside a code point, which
+        // used to panic ("end byte index 500 is not a char boundary").
+        let content = "ủ".repeat(600);
+        let messages = vec![HistoryMessage {
+            role: "user".to_string(),
+            content,
+            tool_calls: None,
+            tool_data: None,
+        }];
+        let output = format_comm_context_history("worker", &messages);
+        assert!(output.contains("..."), "long content should be truncated");
+        // 500 chars survive the cut.
+        assert!(output.matches('ủ').count() == 500);
+    }
+
+    #[test]
+    fn context_history_keeps_short_multibyte_content_intact() {
+        let messages = vec![HistoryMessage {
+            role: "user".to_string(),
+            content: "xin chào đội ngũ".to_string(),
+            tool_calls: None,
+            tool_data: None,
+        }];
+        let output = format_comm_context_history("worker", &messages);
+        assert!(output.contains("xin chào đội ngũ"));
+        assert!(!output.contains("..."));
     }
 }
