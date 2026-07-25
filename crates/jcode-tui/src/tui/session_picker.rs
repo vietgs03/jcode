@@ -2396,7 +2396,12 @@ impl SessionPicker {
         if keyboard_enhanced {
             super::disable_keyboard_enhancement();
         }
-        ratatui::restore();
+        // ratatui::restore() reports failures with eprintln!, which itself
+        // panics when the terminal is already gone (dead stderr, EIO). Use
+        // try_restore + log so a dead terminal can't turn into a panic.
+        if let Err(error) = ratatui::try_restore() {
+            crate::logging::warn(&format!("Failed to restore terminal: {error}"));
+        }
         super::mermaid::clear_image_state();
 
         result

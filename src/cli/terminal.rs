@@ -176,6 +176,14 @@ pub fn install_panic_hook() {
     panic::set_hook(Box::new(move |info| {
         default_hook(info);
 
+        let payload = panic_payload_to_string(info.payload());
+        if !should_mark_session_crashed_for_panic(&payload) {
+            crate::logging::warn(&format!(
+                "Panic hook: stdio write failure treated as dead-terminal exit, not a session crash: {payload}"
+            ));
+            return;
+        }
+
         if let Some(session_id) = get_current_session() {
             print_session_resume_hint(&session_id);
 
@@ -183,12 +191,26 @@ pub fn install_panic_hook() {
                 telemetry::record_crash(&provider, &model, telemetry::SessionEndReason::Panic);
             }
 
-            if let Ok(mut session) = session::Session::load(&session_id) {
+            if let Ok(mut session) = session::Session::load(&session_id)
+                && matches!(session.status, session::SessionStatus::Active)
+            {
                 session.mark_crashed(Some(format!("Panic: {}", info)));
                 let _ = session.save();
             }
         }
     }));
+}
+
+/// Decide whether a panic should mark the current session as Crashed.
+///
+/// Stdio write failures (`failed printing to stderr: ...`) are emitted by
+/// `std::io::stdio::print_to` when `print!`/`eprintln!` hit a dead terminal
+/// (window closed / SSH drop, EIO or EBADF). They say nothing about the health
+/// of the session, which usually lives on in the shared server. Marking it
+/// Crashed both shows a bogus crash banner on the next launch and lets this
+/// dying client's stale snapshot overwrite the server's newer one.
+fn should_mark_session_crashed_for_panic(panic_payload: &str) -> bool {
+    !panic_indicates_dead_stdio(panic_payload)
 }
 
 pub fn mark_current_session_crashed(message: String) {
@@ -409,8 +431,34 @@ fn cleanup_tui_runtime(state: &TuiRuntimeState, restore_terminal: bool) {
         if state.keyboard_enhanced {
             tui::disable_keyboard_enhancement();
         }
-        ratatui::restore();
+        restore_terminal_after_tui();
     }
+}
+
+/// Restore the terminal without ever writing the failure report to stderr.
+///
+/// `ratatui::restore()` reports a failed restore via `eprintln!`. When the
+/// controlling terminal is already gone (window closed, SSH drop, SIGHUP not
+/// yet delivered), the restore fails with EIO *and* stderr is equally dead, so
+/// that `eprintln!` panics with "failed printing to stderr: Input/output
+/// error". The panic hook then marks the session Crashed even though this was
+/// a clean orphan exit and the (server-owned) session is still healthy.
+/// Route the report to the log file instead.
+pub(crate) fn restore_terminal_after_tui() {
+    if let Err(error) = ratatui::try_restore() {
+        crate::logging::warn(&format!("Failed to restore terminal: {error}"));
+    }
+}
+
+/// True when a panic payload is a stdio write failure (`print!`/`eprintln!`
+/// against a dead terminal). These panics are artifacts of the terminal going
+/// away, not evidence that the session crashed: the session state (typically
+/// owned by the shared server) is intact, and labeling it `Crashed { Panic:
+/// stdio }` both misleads the user and lets a stale client-side snapshot
+/// clobber the server's newer one.
+pub(crate) fn panic_indicates_dead_stdio(panic_payload: &str) -> bool {
+    // std::io::stdio::print_to panics with "failed printing to {label}: {e}".
+    panic_payload.starts_with("failed printing to ")
 }
 
 fn cleanup_tui_runtime_for_run_result(
@@ -732,5 +780,83 @@ mod tests {
         let error = write_session_resume_hint(ClosedWriter, "session_closed_pipe")
             .expect_err("closed stderr should be reported as an I/O error");
         assert_eq!(error.kind(), io::ErrorKind::BrokenPipe);
+    }
+
+    /// Regression: closing the terminal window makes `eprintln!` (and
+    /// ratatui's `restore()`) panic with exactly this payload, produced by
+    /// `std::io::stdio::print_to`. The panic hook must NOT record that as a
+    /// session crash: the session lives on in the shared server and next
+    /// launch would show a bogus "session crashed" banner (and a stale
+    /// client snapshot could clobber the server's newer one).
+    #[test]
+    fn dead_stdio_panics_do_not_mark_the_session_crashed() {
+        // The exact payload observed in the wild (Linux, window closed):
+        //   panicked at library/std/src/io/stdio.rs:1165:9:
+        //   failed printing to stderr: Input/output error (os error 5)
+        let eio = "failed printing to stderr: Input/output error (os error 5)";
+        assert!(panic_indicates_dead_stdio(eio));
+        assert!(!should_mark_session_crashed_for_panic(eio));
+
+        // Same class of failure on a redirected/closed stdout.
+        let stdout_gone = "failed printing to stdout: Broken pipe (os error 32)";
+        assert!(panic_indicates_dead_stdio(stdout_gone));
+        assert!(!should_mark_session_crashed_for_panic(stdout_gone));
+    }
+
+    #[test]
+    fn real_panics_still_mark_the_session_crashed() {
+        for payload in [
+            "index out of bounds: the len is 3 but the index is 7",
+            "called `Option::unwrap()` on a `None` value",
+            "explicit panic",
+            // A message merely mentioning printing must not be swallowed.
+            "tool failed printing to stderr diagnostics",
+        ] {
+            assert!(
+                should_mark_session_crashed_for_panic(payload),
+                "payload {payload:?} must still be treated as a real crash"
+            );
+        }
+    }
+
+    /// The signal-path writer (`mark_current_session_crashed`) and the panic
+    /// hook both gate on `SessionStatus::Active`, so a session already saved
+    /// as Closed/Crashed by its owner cannot be re-labeled by a dying client.
+    #[test]
+    fn crash_marking_is_gated_on_active_status() {
+        let _env = crate::storage::lock_test_env();
+        let temp_home = tempfile::TempDir::new().expect("temp home");
+        let prev_home = std::env::var_os("JCODE_HOME");
+        // set_var/remove_var are process-global; lock_test_env serializes them.
+        unsafe {
+            std::env::set_var("JCODE_HOME", temp_home.path());
+        }
+
+        let mut session = session::Session::create(None, None);
+        let session_id = session.id.clone();
+        session.mark_closed();
+        session.save().expect("save closed session");
+
+        // Simulate what the panic hook does after the dead-stdio gate.
+        if let Ok(mut loaded) = session::Session::load(&session_id)
+            && matches!(loaded.status, session::SessionStatus::Active)
+        {
+            loaded.mark_crashed(Some("Panic: should never happen".to_string()));
+            let _ = loaded.save();
+        }
+
+        let reloaded = session::Session::load(&session_id).expect("reload");
+        assert!(
+            !matches!(reloaded.status, session::SessionStatus::Crashed { .. }),
+            "a non-Active session must not be re-labeled Crashed, got {:?}",
+            reloaded.status
+        );
+
+        unsafe {
+            match prev_home {
+                Some(value) => std::env::set_var("JCODE_HOME", value),
+                None => std::env::remove_var("JCODE_HOME"),
+            }
+        }
     }
 }
