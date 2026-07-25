@@ -710,16 +710,51 @@ async fn check_browser_ping() -> Result<bool> {
         return Ok(false);
     }
 
-    let output = tokio::process::Command::new(&bin)
-        .arg("ping")
-        .output()
-        .await?;
+    // The `browser` CLI talks to the Firefox extension over a WebSocket. When the
+    // extension is not connected (never installed, disabled, or Firefox closed),
+    // `browser ping` blocks indefinitely waiting for a reply, which used to hang
+    // the whole status/setup path (observed: `browser status` stuck for minutes).
+    // Cap it and treat a timeout as "not responding" so callers fail fast.
+    match run_browser_cli_capped(&bin, &["ping"], BRIDGE_PING_TIMEOUT).await? {
+        Some(output) if output.status.success() => {
+            Ok(String::from_utf8_lossy(&output.stdout).contains("pong"))
+        }
+        _ => Ok(false),
+    }
+}
 
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        Ok(stdout.contains("pong"))
-    } else {
-        Ok(false)
+/// Maximum time to wait for a single `browser` CLI invocation that round-trips
+/// to the Firefox extension. Kept short so an unresponsive bridge degrades to a
+/// clear "not responding" status instead of an unbounded hang.
+const BRIDGE_PING_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Run the `browser` CLI with a hard timeout, killing the child if it exceeds
+/// the cap. Returns `Ok(None)` on timeout (the child is killed via
+/// `kill_on_drop`), `Ok(Some(output))` when the process finished in time, and
+/// `Err` only when the process could not be spawned or awaited.
+async fn run_browser_cli_capped(
+    bin: &std::path::Path,
+    args: &[&str],
+    timeout: std::time::Duration,
+) -> Result<Option<std::process::Output>> {
+    let child = tokio::process::Command::new(bin)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()?;
+
+    match tokio::time::timeout(timeout, child.wait_with_output()).await {
+        Ok(result) => Ok(Some(result?)),
+        Err(_elapsed) => {
+            crate::logging::warn(&format!(
+                "browser CLI `{}` did not respond within {}s; treating the bridge as not responding",
+                args.join(" "),
+                timeout.as_secs()
+            ));
+            Ok(None)
+        }
     }
 }
 
@@ -729,11 +764,14 @@ async fn probe_bridge_action_support(action: &str, params_json: &str) -> Result<
         return Ok(false);
     }
 
-    let output = tokio::process::Command::new(&bin)
-        .arg(action)
-        .arg(params_json)
-        .output()
-        .await?;
+    // Same unbounded-hang risk as `check_browser_ping`: this round-trips to the
+    // extension. A timeout means the bridge stopped responding mid-probe, so
+    // report the action as unsupported rather than hanging the status path.
+    let Some(output) =
+        run_browser_cli_capped(&bin, &[action, params_json], BRIDGE_PING_TIMEOUT).await?
+    else {
+        return Ok(false);
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -826,7 +864,17 @@ async fn wait_for_ready(timeout_secs: u64) -> Result<bool> {
 }
 
 fn should_prompt_extension_install(status: &BrowserStatus) -> bool {
-    !status.setup_complete
+    // Prompt on a first-time setup (marker not yet written)...
+    if !status.setup_complete {
+        return true;
+    }
+    // ...but a stale `.setup-complete` marker must not permanently suppress the
+    // installer. If setup previously "completed" yet the bridge is now not
+    // responding while the binary is installed, the extension is missing from
+    // the live Firefox profile (uninstalled, disabled, or a profile switch).
+    // Re-prompting is the only way setup can recover; otherwise setup reports
+    // "already completed" forever and never reinstalls the extension.
+    status.binary_installed && !status.responding
 }
 
 async fn install_extension() -> Result<String> {
