@@ -9,6 +9,13 @@ pub const OAUTH_BILLING_HEADER: &str = "cc_version=2.1.123; cc_entrypoint=sdk-cl
 
 const CLAUDE_CODE_IDENTITY: &str = "You are a Claude agent, built on Anthropic's Claude Agent SDK.";
 
+/// User-turn text appended when a conversation would otherwise end with an
+/// assistant message. Anthropic (and especially prefill-averse models like
+/// claude-fable-5) require the request to end with a user turn; this minimal,
+/// self-explanatory continuation keeps an interrupted turn resumable instead of
+/// failing the whole request with a 400 prefill error.
+const PREFILL_GUARD_CONTINUATION_TEXT: &str = "Continue.";
+
 pub fn format_messages(messages: &[Message], is_oauth: bool) -> Vec<ApiMessage> {
     use std::collections::HashSet;
 
@@ -102,6 +109,30 @@ pub fn format_messages(messages: &[Message], is_oauth: bool) -> Vec<ApiMessage> 
             "[anthropic] Merged {} consecutive same-role messages",
             pre_merge_count - merged.len()
         ));
+    }
+
+    // Anthropic requires the conversation to end with a user message; several
+    // models (e.g. claude-fable-5) reject a trailing assistant message outright
+    // with 400 "This model does not support assistant message prefill. The
+    // conversation must end with a user message." jcode never intends to
+    // prefill an assistant turn, so a trailing assistant message here is always
+    // an accident of an upstream path that started a turn without appending a
+    // user message (observed after a server-reload auto-resume, where the
+    // continuation is delivered as a system-prompt reminder with empty user
+    // content). Repair it by appending a minimal user turn so the request is
+    // accepted instead of failing the whole (often already interrupted) turn.
+    if merged.last().is_some_and(|last| last.role == "assistant") {
+        jcode_logging::warn(
+            "[anthropic] Conversation ended with an assistant message; appending a \
+             continuation user turn to avoid a model prefill rejection (400)",
+        );
+        merged.push(ApiMessage {
+            role: "user".to_string(),
+            content: vec![ApiContentBlock::Text {
+                text: PREFILL_GUARD_CONTINUATION_TEXT.to_string(),
+                cache_control: None,
+            }],
+        });
     }
 
     // Validate: check each assistant message with tool_use has matching tool_result in next user message
@@ -1108,5 +1139,73 @@ mod cache_prefix_invariant_tests {
             with_cache.first().copied(),
             "cache breakpoint must be on the final tool"
         );
+    }
+
+    /// Regression for the reload auto-resume 400: a conversation whose last
+    /// message is an assistant turn (no trailing user message) must be repaired
+    /// so the request ends with a user turn. Without this guard, claude-fable-5
+    /// rejects the request with 400 "This model does not support assistant
+    /// message prefill. The conversation must end with a user message.", which
+    /// was observed looping forever on a server-reload continuation (the
+    /// continuation is delivered as a system-prompt reminder, so no user message
+    /// is appended and the transcript ends on the interrupted assistant turn).
+    #[test]
+    fn trailing_assistant_message_is_repaired_into_a_user_turn() {
+        let messages = vec![
+            text_msg(Role::User, "start the task"),
+            text_msg(
+                Role::Assistant,
+                "partial progress\n\n[generation interrupted - server reloading]",
+            ),
+        ];
+
+        let formatted = format_messages(&messages, true);
+
+        assert_eq!(
+            formatted.last().map(|m| m.role.as_str()),
+            Some("user"),
+            "request must end with a user message to satisfy the Anthropic prefill contract: {:?}",
+            formatted
+                .iter()
+                .map(|m| m.role.as_str())
+                .collect::<Vec<_>>()
+        );
+        // The original assistant turn is preserved; only a new user turn is added.
+        assert_eq!(formatted.len(), 3);
+        assert_eq!(formatted[1].role, "assistant");
+        let ends_with_text = matches!(
+            formatted.last().and_then(|m| m.content.first()),
+            Some(ApiContentBlock::Text { text, .. }) if !text.trim().is_empty()
+        );
+        assert!(
+            ends_with_text,
+            "appended user turn must carry non-empty text so the model has something to answer"
+        );
+    }
+
+    /// The guard must be inert for normal turns: a conversation already ending
+    /// with a user message is passed through unchanged (no phantom user turn).
+    #[test]
+    fn conversation_ending_with_user_is_left_untouched() {
+        let messages = vec![
+            text_msg(Role::User, "Q1"),
+            text_msg(Role::Assistant, "A1"),
+            text_msg(Role::User, "Q2"),
+        ];
+
+        let formatted = format_messages(&messages, true);
+
+        assert_eq!(formatted.len(), 3, "no extra user turn should be appended");
+        assert_eq!(formatted.last().map(|m| m.role.as_str()), Some("user"));
+        if let Some(ApiContentBlock::Text { text, .. }) =
+            formatted.last().and_then(|m| m.content.first())
+        {
+            assert_eq!(
+                text, "Q2",
+                "the real final user turn must be preserved verbatim"
+            );
+        } else {
+            panic!("expected the final user turn to remain a text block");
+        }
     }
 }
