@@ -584,6 +584,9 @@ impl App {
             self.handle_update_status(status);
         }
 
+        // Present jcode as a Warp CLI agent from launch (no-op outside Warp).
+        self.announce_warp_agent_session_start();
+
         loop {
             self.sync_sleep_guard();
             let desired_redraw = crate::tui::redraw_interval(&self);
@@ -715,6 +718,9 @@ impl App {
         let mut handterm_native_scroll =
             super::handterm_native_scroll::HandtermNativeScrollClient::connect_from_env();
         let mut remote_state = remote::RemoteRunState::default();
+
+        // Present jcode as a Warp CLI agent from launch (no-op outside Warp).
+        self.announce_warp_agent_session_start();
 
         'outer: loop {
             if self.display_messages.is_empty() {

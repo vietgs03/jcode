@@ -24,6 +24,11 @@ pub(super) async fn process_turn_with_input(
     event_stream: &mut EventStream,
     bus_receiver: &mut Receiver<BusEvent>,
 ) {
+    // Report "working" to Warp before the turn blocks this loop. The per-tick
+    // sync can't observe the in-progress state while run_turn_interactive owns
+    // the thread, so drive the transition explicitly here (no-op outside Warp).
+    app.sync_warp_agent();
+
     match app
         .run_turn_interactive(terminal, event_stream, Some(bus_receiver))
         .await
@@ -127,6 +132,9 @@ pub(super) fn handle_tick(app: &mut App) -> bool {
         app.pending_turn = true;
         needs_redraw = true;
     }
+
+    // Mirror processing state to Warp's per-tab agent status (no-op outside Warp).
+    app.sync_warp_agent();
 
     needs_redraw
 }
@@ -530,4 +538,8 @@ pub(super) fn finish_turn(app: &mut App) {
         }
     }
     let _ = super::commands::maybe_begin_pending_local_transfer(app);
+
+    // Report turn completion (stop / stop_failure) to Warp now that
+    // is_processing has cleared, rather than waiting for the next tick.
+    app.sync_warp_agent();
 }

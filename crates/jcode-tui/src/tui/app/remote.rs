@@ -302,6 +302,10 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
     detect_and_cancel_stall(app, remote).await;
     needs_redraw |= recover_stuck_remote_history(app, remote).await;
     needs_redraw |= detect_starved_queued_followup(app);
+
+    // Mirror processing state to Warp's per-tab agent status (no-op outside Warp).
+    app.sync_warp_agent();
+
     needs_redraw
 }
 

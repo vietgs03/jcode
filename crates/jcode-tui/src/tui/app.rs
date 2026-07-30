@@ -109,6 +109,7 @@ mod turn;
 mod turn_memory;
 mod turn_notify;
 mod ui_prefs;
+mod warp_agent;
 
 pub(crate) use self::state_ui_storage::compact_display_messages_for_storage;
 

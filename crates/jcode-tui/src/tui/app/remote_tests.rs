@@ -12,6 +12,11 @@ use crate::tui::info_widget::{MemoryState, StepStatus};
 use anyhow::Result;
 use std::sync::Arc;
 
+/// Serializes the Warp-agent tests below: they share the process-global
+/// `WARP_CLI_AGENT_PROTOCOL_VERSION` env var and the emitter's capture sink, so
+/// they must not run concurrently with each other.
+static WARP_TEST_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 struct MockProvider;
 
 #[async_trait::async_trait]
@@ -1111,4 +1116,95 @@ fn remote_submit_input_never_strands_a_local_pending_turn() {
         vec!["plain prompt".to_string()],
         "the prompt should be queued for the remote tick loop"
     );
+}
+
+/// End-to-end at the App level: drive `sync_warp_agent()` (the method both run
+/// loops call) across a simulated turn and assert the real emitter produces the
+/// Warp lifecycle events. Exercises the App -> jcode-base emission path, not
+/// just the base module in isolation.
+#[test]
+fn sync_warp_agent_emits_turn_lifecycle_events() {
+    let _guard = WARP_TEST_GUARD.lock().unwrap_or_else(|p| p.into_inner());
+    // The emitter gates on Warp's protocol env var; set it for this test.
+    // SAFETY: serialized by WARP_TEST_GUARD; cleared at the end.
+    unsafe {
+        std::env::set_var("WARP_CLI_AGENT_PROTOCOL_VERSION", "1");
+    }
+    crate::warp_agent::test_sink::start();
+
+    let mut app = create_test_app();
+    app.is_remote = true;
+    app.runtime_mode = crate::tui::app::AppRuntimeMode::RemoteClient;
+
+    // Launch handshake, then a turn: working -> success.
+    app.announce_warp_agent_session_start();
+    app.is_processing = true;
+    app.sync_warp_agent();
+    app.is_processing = false;
+    app.sync_warp_agent();
+
+    let events: Vec<String> = crate::warp_agent::test_sink::events()
+        .into_iter()
+        .map(|(e, _)| e)
+        .collect();
+    assert_eq!(
+        events,
+        vec![
+            "session_start".to_string(),
+            "prompt_submit".to_string(),
+            "stop".to_string(),
+        ],
+        "App turn lifecycle should emit session_start, prompt_submit, stop"
+    );
+
+    // A failed turn latches into stop_failure.
+    crate::warp_agent::test_sink::start();
+    app.is_processing = true;
+    app.sync_warp_agent();
+    crate::warp_agent::note_turn_failed();
+    app.is_processing = false;
+    app.sync_warp_agent();
+    let failed: Vec<String> = crate::warp_agent::test_sink::events()
+        .into_iter()
+        .map(|(e, _)| e)
+        .collect();
+    assert_eq!(
+        failed,
+        vec![
+            "session_start".to_string(),
+            "prompt_submit".to_string(),
+            "stop_failure".to_string(),
+        ],
+        "a latched failure should surface as stop_failure"
+    );
+
+    unsafe {
+        std::env::remove_var("WARP_CLI_AGENT_PROTOCOL_VERSION");
+    }
+}
+
+/// Replay/export App instances must never write Warp control sequences to a
+/// terminal they don't own.
+#[test]
+fn sync_warp_agent_is_silent_in_replay_mode() {
+    let _guard = WARP_TEST_GUARD.lock().unwrap_or_else(|p| p.into_inner());
+    unsafe {
+        std::env::set_var("WARP_CLI_AGENT_PROTOCOL_VERSION", "1");
+    }
+    crate::warp_agent::test_sink::start();
+
+    let mut app = create_test_app();
+    app.is_replay = true;
+    app.is_processing = true;
+    app.sync_warp_agent();
+    app.announce_warp_agent_session_start();
+
+    assert!(
+        crate::warp_agent::test_sink::events().is_empty(),
+        "replay instances must not emit Warp events"
+    );
+
+    unsafe {
+        std::env::remove_var("WARP_CLI_AGENT_PROTOCOL_VERSION");
+    }
 }

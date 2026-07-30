@@ -791,6 +791,10 @@ impl App {
         self.last_stream_error = Some(error.clone());
         self.restore_failed_input_to_box();
 
+        // Latch the failure so Warp reports the next idle transition as an
+        // error state (stop_failure) rather than a success. No-op outside Warp.
+        crate::warp_agent::note_turn_failed();
+
         if let Some(prompt) = crate::provider::parse_failover_prompt_message(&error) {
             self.handle_provider_failover_prompt(prompt);
             return;

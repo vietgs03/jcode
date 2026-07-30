@@ -11,7 +11,7 @@ pub use jcode_config_types::{
     NamedProviderAuth, NamedProviderConfig, NamedProviderModelConfig, NamedProviderType,
     NativeScrollbarConfig, NotificationsConfig, OverscrollStatusMode, PowerConfig, ProviderConfig,
     ReasoningDisplayMode, SafetyConfig, SessionPickerResumeAction, SponsorsConfig, SwarmSpawnMode,
-    SwarmStripLayout, TerminalConfig, UpdateChannel, WebSearchConfig, WebSearchEngine,
+    SwarmStripLayout, TerminalConfig, UpdateChannel, WarpConfig, WebSearchConfig, WebSearchEngine,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -494,6 +494,9 @@ pub struct Config {
 
     /// Desktop notifications for interactive sessions (e.g. turn completion)
     pub notifications: NotificationsConfig,
+
+    /// Warp terminal third-party CLI-agent integration (status + notifications)
+    pub warp: WarpConfig,
 
     /// WebSocket gateway configuration (for iOS/web clients)
     pub gateway: GatewayConfig,

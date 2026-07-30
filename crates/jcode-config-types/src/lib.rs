@@ -1430,6 +1430,37 @@ impl Default for NotificationsConfig {
     }
 }
 
+/// Warp terminal third-party CLI-agent integration.
+///
+/// When jcode runs inside Warp (detected via the `WARP_CLI_AGENT_PROTOCOL_VERSION`
+/// environment variable), it can emit the structured OSC 777 `warp://cli-agent`
+/// notifications Warp uses to drive its agent toolbelt, per-tab status
+/// (working / done / blocked), and in-app + desktop notifications.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WarpConfig {
+    /// Emit Warp CLI-agent status/notification events when running inside Warp
+    /// (default: true). Has no effect outside Warp.
+    pub cli_agent_integration: bool,
+    /// The agent identity advertised to Warp in the OSC payload's `agent`
+    /// field. Warp only renders rich per-tab status and notifications for
+    /// agents on its built-in supported list, so this must be one of Warp's
+    /// recognized command prefixes (e.g. "pi", "omp", "claude", "codex",
+    /// "gemini", "opencode", "auggie", "droid"). jcode is not on Warp's list,
+    /// so it borrows a supported identity; "pi" (an open-source CLI agent) is
+    /// the closest neutral fit and the default.
+    pub cli_agent_identity: String,
+}
+
+impl Default for WarpConfig {
+    fn default() -> Self {
+        Self {
+            cli_agent_integration: true,
+            cli_agent_identity: "pi".to_string(),
+        }
+    }
+}
+
 /// Safety system & notification configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
