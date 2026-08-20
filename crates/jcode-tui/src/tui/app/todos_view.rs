@@ -212,14 +212,8 @@ fn build_todos_view_markdown(session_id: Option<&str>, todos: &[TodoItem]) -> St
         .and_then(crate::id::extract_session_name)
         .map(|name| format!("`{}`", name))
         .unwrap_or_else(|| "this session".to_string());
-    let session_id_line = session_id.map(|id| format!("- Session ID: `{}`\n", id));
-
     if todos.is_empty() {
-        return format!(
-            "# Todos\n\nDedicated todo view for {}.\n\n{}\nNo todos saved yet for this session. The model can populate them with the `todo` tool.\n",
-            session_label,
-            session_id_line.unwrap_or_default()
-        );
+        return format!("# Todos\n\nNo todos saved yet for {}.\n", session_label);
     }
 
     let total = todos.len();
@@ -232,40 +226,11 @@ fn build_todos_view_markdown(session_id: Option<&str>, todos: &[TodoItem]) -> St
         .filter(|todo| todo.status == "in_progress")
         .count();
     let pending = todos.iter().filter(|todo| todo.status == "pending").count();
-    let cancelled = todos
-        .iter()
-        .filter(|todo| todo.status == "cancelled")
-        .count();
-    let blocked = todos
-        .iter()
-        .filter(|todo| todo.status != "completed" && !todo.blocked_by.is_empty())
-        .count();
     let percent = ((completed as f64 / total as f64) * 100.0).round() as u64;
-    let weighted_confidence = weighted_todo_confidence(todos);
-    let lowest_completed_confidence = todos
-        .iter()
-        .filter(|todo| todo.status == "completed")
-        .filter_map(|todo| todo.completion_confidence)
-        .min();
-    let missing_completion_confidence = todos
-        .iter()
-        .filter(|todo| todo.status == "completed" && todo.completion_confidence.is_none())
-        .count();
 
     let mut markdown = format!(
-        "# Todos\n\nDedicated todo view for {}.\n\n{}- Progress: **{}/{} completed** ({}%)\n- In progress: {}\n- Pending: {}\n- Blocked: {}\n- Cancelled: {}\n- Weighted confidence: **{}**\n- Lowest completed confidence: **{}**\n- Missing completion confidence: {}\n",
-        session_label,
-        session_id_line.unwrap_or_default(),
-        completed,
-        total,
-        percent,
-        in_progress,
-        pending,
-        blocked,
-        cancelled,
-        format_confidence_value(weighted_confidence),
-        format_confidence_value(lowest_completed_confidence),
-        missing_completion_confidence,
+        "# Todos\n\n{} · **{}/{} done** ({}%) · {} active · {} pending\n",
+        session_label, completed, total, percent, in_progress, pending
     );
 
     let sections = [
@@ -367,38 +332,16 @@ fn sorted_todos_for_status<'a>(todos: &'a [TodoItem], status: &str) -> Vec<&'a T
 }
 
 fn format_todo_markdown(todo: &TodoItem) -> String {
+    // Keep the dedicated view scannable. Detailed confidence, IDs, owners,
+    // and dependency data remain available through `context` and the tool
+    // result, but should not push the conversation off screen by default.
     let mut line = format!(
-        "- {} `[{}]` {}\n",
+        "- {} {}\n",
         status_badge(&todo.status, !todo.blocked_by.is_empty()),
-        todo.priority,
         todo.content
     );
-    line.push_str(&format!("  - id: `{}`\n", todo.id));
-    line.push_str(&format!(
-        "  - confidence: `{}`\n",
-        format_confidence_value(todo.confidence)
-    ));
-    if todo.status == "completed" || todo.completion_confidence.is_some() {
-        line.push_str(&format!(
-            "  - completion confidence: `{}`\n",
-            format_confidence_value(todo.completion_confidence)
-        ));
-    }
-    if let Some(assigned_to) = todo
-        .assigned_to
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        line.push_str(&format!("  - assigned to: `{}`\n", assigned_to));
-    }
     if !todo.blocked_by.is_empty() {
-        let deps = todo
-            .blocked_by
-            .iter()
-            .map(|id| format!("`{}`", id))
-            .collect::<Vec<_>>()
-            .join(", ");
-        line.push_str(&format!("  - blocked by: {}\n", deps));
+        line.push_str("  - blocked\n");
     }
     line
 }
@@ -517,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn todos_view_markdown_includes_confidence_summary_and_item_fields() {
+    fn todos_view_markdown_is_compact_and_omits_internal_item_fields() {
         let todos = vec![
             todo(
                 "todo-1",
@@ -539,12 +482,18 @@ mod tests {
 
         let markdown = build_todos_view_markdown(Some("session_test"), &todos);
 
-        assert!(markdown.contains("- Weighted confidence: **86%**"));
-        assert!(markdown.contains("- Lowest completed confidence: **95%**"));
-        assert!(markdown.contains("- Missing completion confidence: 0"));
-        assert!(markdown.contains("  - confidence: `80%`"));
-        assert!(markdown.contains("  - confidence: `70%`"));
-        assert!(markdown.contains("  - completion confidence: `95%`"));
+        assert!(
+            markdown.contains("**1/2 done** (50%) · 1 active · 0 pending"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("Validate confidence side panel"),
+            "{markdown}"
+        );
+        assert!(markdown.contains("Finish completed item"), "{markdown}");
+        assert!(!markdown.contains("id: `todo-1`"), "{markdown}");
+        assert!(!markdown.contains("confidence: `80%`"), "{markdown}");
+        assert!(!markdown.contains("completion confidence"), "{markdown}");
     }
 
     #[test]
