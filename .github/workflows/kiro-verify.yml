@@ -1,0 +1,70 @@
+name: Kiro Verify (temporary)
+
+on:
+  push:
+    branches: [ci/kiro-verify]
+
+concurrency:
+  group: kiro-verify
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  RUSTUP_TOOLCHAIN: stable
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: kiro-verify
+          cache-on-failure: "true"
+
+      - name: rustfmt (changed crates)
+        continue-on-error: true
+        run: |
+          rustfmt --edition 2024 --check crates/jcode-provider-kiro/src/lib.rs crates/jcode-base/src/auth/kiro.rs crates/jcode-base/src/provider/kiro.rs src/cli/login/kiro.rs crates/jcode-tui/src/tui/app/auth_kiro.rs
+
+      - name: cargo check (all targets of affected crates)
+        run: |
+          cargo check --locked --all-targets --message-format=short \
+            -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata \
+            -p jcode-base -p jcode-tui -p jcode 2>&1 | tee check.log
+          test ${PIPESTATUS[0]} -eq 0
+
+      - name: clippy (report Kiro-related warnings)
+        continue-on-error: true
+        run: |
+          cargo clippy --locked --all-targets --message-format=short \
+            -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata \
+            -p jcode-base -p jcode-tui -p jcode 2>&1 | tee clippy.log
+          echo "---- warnings mentioning kiro ----"
+          grep -i -A3 "kiro" clippy.log | grep -E "warning|error" || true
+
+      - name: tests (provider crates)
+        continue-on-error: true
+        run: cargo test --locked -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata 2>&1 | tail -60
+
+      - name: tests (jcode-base provider/auth)
+        continue-on-error: true
+        run: |
+          cargo test --locked -p jcode-base --lib -- provider:: auth:: provider_catalog 2>&1 | grep -E "^test .*(FAILED|panicked)|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -80
+
+      - name: tests (jcode CLI)
+        continue-on-error: true
+        run: |
+          cargo test --locked -p jcode --lib -- provider_init auth_test login commands 2>&1 | grep -E "^test .*FAILED|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -60
+          cargo test --locked -p jcode --test auth_login_flow 2>&1 | grep -E "^test .*FAILED|^test result|panicked at" | tail -20
+
+      - name: tests (TUI login surfaces)
+        continue-on-error: true
+        run: |
+          cargo test --locked -p jcode-tui --lib -- login provider picker 2>&1 | grep -E "^test .*FAILED|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -60
