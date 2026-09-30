@@ -20,6 +20,7 @@ Credentials are stored locally:
 - Codex CLI auth source (read in place only after confirmation): `~/.codex/auth.json`
 - Gemini native OAuth: `~/.jcode/gemini_oauth.json`
 - Gemini CLI import fallback: `~/.gemini/oauth_creds.json`
+- Kiro (AWS Builder ID / IAM Identity Center / imported Kiro IDE login): `~/.jcode/kiro_oauth.json`
 - Copilot CLI plaintext fallback: `~/.copilot/config.json`
 - Legacy Copilot JSON sources: `~/.config/github-copilot/hosts.json`, `~/.config/github-copilot/apps.json`
 
@@ -32,6 +33,8 @@ Relevant code:
 - Azure OpenAI transport: `src/provider/openrouter.rs`
 - Gemini login + refresh: `src/auth/gemini.rs`
 - Gemini Code Assist provider: `src/provider/gemini.rs`
+- Kiro login + refresh: `crates/jcode-base/src/auth/kiro.rs`
+- Kiro provider: `crates/jcode-base/src/provider/kiro.rs` (request/stream shaping in `crates/jcode-provider-kiro`)
 - OpenAI-compatible provider metadata/login descriptors: `crates/jcode-provider-metadata/src/lib.rs`
 
 ## Claude (Claude Max)
@@ -244,6 +247,53 @@ For model providers, `auth-test` attempts:
 Use `--no-tool-smoke` if you only want the auth/simple-runtime checks.
 
 For Gmail/Google it verifies credential discovery and token refresh, but skips model smoke because it is not a model provider.
+
+## Kiro
+
+Kiro models are served by the AWS CodeWhisperer streaming API
+(`GenerateAssistantResponse`) using a Kiro login.
+
+### Login steps
+1. Run `jcode login --provider kiro` (or `/login kiro` inside the TUI) and pick a method:
+   - **AWS Builder ID** (default): AWS device flow for personal accounts.
+   - **AWS IAM Identity Center**: enter your organization's start URL (for example
+     `https://my-org.awsapps.com/start`) and region.
+   - **Import the Kiro IDE login**: only offered when `~/.aws/sso/cache/kiro-auth-token.json`
+     exists. This covers the Kiro IDE's Google/GitHub sign-in.
+2. Confirm the displayed code in the browser. `--no-browser` prints the URL (and a QR code)
+   without opening a browser.
+3. Verify with `jcode --provider kiro run "Say hello from jcode"` or
+   `jcode --provider kiro auth-test`.
+
+The TUI uses AWS Builder ID unless `JCODE_KIRO_START_URL` (plus optional `JCODE_KIRO_REGION`)
+selects an IAM Identity Center. `jcode login --provider kiro` also skips its menu when
+`JCODE_KIRO_START_URL` is set.
+
+### Runtime notes
+- The device flow registers a dedicated OIDC client for jcode, so it never shares a session
+  with the Kiro IDE. An imported IDE login is copied into `~/.jcode/kiro_oauth.json`; the IDE
+  file itself is never modified, but the two apps then share a refresh token and the IDE may
+  ask you to sign in again later.
+- Access tokens are refreshed automatically (AWS SSO-OIDC for Builder ID / Identity Center,
+  the Kiro auth service for imported social logins), and once more if the API rejects one.
+- Requests go to `https://q.<region>.amazonaws.com/generateAssistantResponse`. The API region
+  comes from the profile ARN, otherwise `us-east-1` (or `eu-central-1` for `eu-*` logins).
+- Select models with `/model` or `kiro:<model>` (for example `kiro:claude-sonnet-4.5`).
+  Availability depends on your Kiro plan and region.
+
+### Environment variables
+- `JCODE_KIRO_MODEL`: default model (default: `claude-sonnet-4.5`)
+- `JCODE_KIRO_START_URL` / `JCODE_KIRO_REGION`: IAM Identity Center start URL and region
+- `JCODE_KIRO_PROFILE_ARN`: CodeWhisperer profile ARN (some Identity Center setups require it;
+  jcode tries to look it up after login)
+- `JCODE_KIRO_API_REGION` / `JCODE_KIRO_API_BASE`: override the API region or base URL
+- `JCODE_KIRO_USER_AGENT`: override the API User-Agent
+
+### Troubleshooting
+- 401/403: re-run `jcode login --provider kiro`. For IAM Identity Center, also set
+  `JCODE_KIRO_PROFILE_ARN` if requests keep being rejected.
+- "model is not available": pick a model your Kiro plan and region support.
+- "input is too long": jcode compacts the conversation automatically and retries.
 
 ## OpenAI-compatible API-key providers
 
