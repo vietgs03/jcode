@@ -39,37 +39,53 @@ jobs:
           key: kiro-verify-${{ matrix.label }}
           cache-on-failure: "true"
 
-      - name: clippy --no-deps -D warnings (affected crates)
+      # Mirrors upstream CI's "check --all-targets --all-features" + clippy gate for
+      # the crates this branch touches. assertions_on_constants is allowed only
+      # because master already fails on it (jcode-provider-metadata tests) and it
+      # otherwise stops clippy before the dependent crates are linted.
+      - name: clippy --all-targets --all-features (affected crates, keep going)
         continue-on-error: true
         run: |
           set +e
           pkgs="-p jcode-provider-core -p jcode-provider-metadata -p jcode-base -p jcode-tui -p jcode"
           if [ -d crates/jcode-provider-kiro ]; then pkgs="$pkgs -p jcode-provider-kiro"; fi
-          cargo clippy --locked --no-deps --all-targets --message-format=short $pkgs -- -D warnings > clippy.log 2>&1
+          cargo clippy --locked --no-deps --keep-going --all-targets --all-features --message-format=short $pkgs -- -D warnings -A clippy::assertions_on_constants > clippy.log 2>&1
           echo "clippy exit: $?"
-          grep -E "^(crates|src)/[^ ]+: (error|warning)" clippy.log | sort | uniq | head -80
+          echo "== diagnostics"
+          grep -E "^[^ ]+\.rs:[0-9]+:[0-9]+: (error|warning)" clippy.log | sort | uniq
+          echo "== failed units"
+          grep -E "could not compile" clippy.log | sort | uniq
+          echo "== linted workspace crates"
+          grep -E "^\s*Checking jcode" clippy.log | sed -E 's/^\s+//' | sort | uniq
 
-      - name: full test suites
+      - name: warning budget (same count as scripts/check_warning_budget.sh)
         continue-on-error: true
         run: |
           set +e
-          run() {
-            label="$1"; shift
-            "$@" > "test-$label.log" 2>&1
-            echo "== $label exit=$?"
-            grep -E "^test result|^test .* FAILED" "test-$label.log" | head -60
-          }
-          run provider-crates cargo test --locked -p jcode-provider-core -p jcode-provider-metadata
-          run base cargo test --locked -p jcode-base --lib
-          run tui cargo test --locked -p jcode-tui --lib
-          run cli cargo test --locked -p jcode --lib
-          run auth-login-flow cargo test --locked -p jcode --test auth_login_flow
-          run provider-matrix cargo test --locked -p jcode --test provider_matrix
+          current=$(cargo check -q 2>&1 | grep -c '^warning:')
+          echo "warning count: current=$current budget=$(cat scripts/warning_budget.txt)"
 
-      - name: isolated re-runs of suspected flaky tests
+      - name: e2e (as in upstream Build & Test)
         continue-on-error: true
         run: |
           set +e
-          cargo test --locked -p jcode-tui --lib -- --exact tui::app::tests::test_agent_model_picker_inherit_row_uses_provider_default_when_inherited_model_is_unknown 2>&1 | grep -E "^test |test result"
-          cargo test --locked -p jcode-base --lib -- --exact provider_catalog::provider_catalog_tests::named_provider_profile_reports_malformed_config_instead_of_unknown_profile 2>&1 | grep -E "^test |test result"
-          cargo test --locked -p jcode-base --lib -- --exact provider_catalog::provider_catalog_tests::newest_release_picker_uses_recency_within_a_tier 2>&1 | grep -E "^test |test result"
+          cargo test --locked --test e2e > test-e2e.log 2>&1
+          echo "== e2e exit=$?"
+          grep -E "^test result|^test .* FAILED" test-e2e.log | head -60
+
+      - name: race probe for agent model picker tests (25x)
+        continue-on-error: true
+        run: |
+          set +e
+          filter=tui::app::tests::test_agent_model_picker_
+          cargo test --locked -p jcode-tui --lib -- "$filter" > probe-0.log 2>&1
+          grep -E "^test result" probe-0.log
+          fails=0
+          for i in $(seq 1 25); do
+            cargo test --locked -p jcode-tui --lib -- "$filter" > probe.log 2>&1
+            if grep -q "^---- tui::app::tests::test_agent_model_picker_inherit_row_uses_provider_default_when_inherited_model_is_unknown" probe.log; then
+              fails=$((fails+1))
+              grep -m1 -A6 "^---- tui::app::tests::test_agent_model_picker_inherit_row" probe.log | grep -E "left|right"
+            fi
+          done
+          echo "inherit-row failures: $fails/25"
