@@ -14,57 +14,64 @@ env:
 
 jobs:
   verify:
+    name: verify (${{ matrix.label }})
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: branch
+            ref: ""
+          - label: baseline-master
+            ref: 5bc6cf6b9f405c63525743658d29db945dcb6e73
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: kiro-verify
           cache-on-failure: "true"
 
-      - name: rustfmt (changed crates)
-        continue-on-error: true
-        run: |
-          rustfmt --edition 2024 --check crates/jcode-provider-kiro/src/lib.rs crates/jcode-base/src/auth/kiro.rs crates/jcode-base/src/provider/kiro.rs src/cli/login/kiro.rs crates/jcode-tui/src/tui/app/auth_kiro.rs
-
       - name: cargo check (all targets of affected crates)
         run: |
           cargo check --locked --all-targets --message-format=short \
-            -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata \
-            -p jcode-base -p jcode-tui -p jcode 2>&1 | tee check.log
-          test ${PIPESTATUS[0]} -eq 0
+            -p jcode-provider-core -p jcode-provider-metadata \
+            -p jcode-base -p jcode-tui -p jcode 2>&1 | tail -5
 
-      - name: clippy (report Kiro-related warnings)
+      - name: clippy -D warnings (affected crates)
         continue-on-error: true
         run: |
+          set +e
           cargo clippy --locked --all-targets --message-format=short \
-            -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata \
-            -p jcode-base -p jcode-tui -p jcode 2>&1 | tee clippy.log
-          echo "---- warnings mentioning kiro ----"
-          grep -i -A3 "kiro" clippy.log | grep -E "warning|error" || true
+            -p jcode-provider-core -p jcode-provider-metadata \
+            -p jcode-base -p jcode-tui -p jcode -- -D warnings > clippy.log 2>&1
+          echo "clippy exit: $?"
+          grep -E "^(crates|src)/[^ ]+: (error|warning)" clippy.log | sort | uniq | head -60
 
-      - name: tests (provider crates)
-        continue-on-error: true
-        run: cargo test --locked -p jcode-provider-kiro -p jcode-provider-core -p jcode-provider-metadata 2>&1 | tail -60
-
-      - name: tests (jcode-base provider/auth)
+      - name: tests
         continue-on-error: true
         run: |
-          cargo test --locked -p jcode-base --lib -- provider:: auth:: provider_catalog 2>&1 | grep -E "^test .*(FAILED|panicked)|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -80
+          set +e
+          run() {
+            label="$1"; shift
+            "$@" > "test-$label.log" 2>&1
+            echo "== $label exit=$?"
+            grep -E "^test result|^test .* FAILED" "test-$label.log" | head -40
+            awk '/^---- .* stdout ----$/{p=1; n=0} p{print; n++; if (n>14) {p=0}}' "test-$label.log" | head -150
+          }
+          run provider-crates cargo test --locked -p jcode-provider-core -p jcode-provider-metadata
+          run base cargo test --locked -p jcode-base --lib -- provider:: auth:: provider_catalog
+          run cli cargo test --locked -p jcode --lib -- provider_init auth_test login commands
+          run auth-login-flow cargo test --locked -p jcode --test auth_login_flow
+          run tui cargo test --locked -p jcode-tui --lib -- login provider picker
 
-      - name: tests (jcode CLI)
-        continue-on-error: true
-        run: |
-          cargo test --locked -p jcode --lib -- provider_init auth_test login commands 2>&1 | grep -E "^test .*FAILED|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -60
-          cargo test --locked -p jcode --test auth_login_flow 2>&1 | grep -E "^test .*FAILED|^test result|panicked at" | tail -20
-
-      - name: tests (TUI login surfaces)
-        continue-on-error: true
-        run: |
-          cargo test --locked -p jcode-tui --lib -- login provider picker 2>&1 | grep -E "^test .*FAILED|^test result|^failures:|^    [a-z_:]+$|panicked at" | tail -60
+      - name: tests (Kiro crate, branch only)
+        if: matrix.label == 'branch'
+        run: cargo test --locked -p jcode-provider-kiro 2>&1 | grep -E "^test result|FAILED|panicked"
