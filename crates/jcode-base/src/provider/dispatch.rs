@@ -161,6 +161,16 @@ impl MultiProvider {
                     ))
                 }
             }
+            ActiveProvider::Kiro => {
+                if let Some(kiro) = self.kiro_provider() {
+                    kiro.complete(messages, tools, system, resume_session_id)
+                        .await
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Kiro is not available. Run `jcode login --provider kiro`."
+                    ))
+                }
+            }
             ActiveProvider::OpenRouter => {
                 let openrouter = self.active_openrouter_execution_provider();
                 if let Some(openrouter) = openrouter {
@@ -329,6 +339,22 @@ impl MultiProvider {
                 } else {
                     Err(anyhow::anyhow!(
                         "AWS Bedrock is not available. Configure AWS credentials and region, or set AWS_PROFILE/AWS_REGION."
+                    ))
+                }
+            }
+            ActiveProvider::Kiro => {
+                if let Some(kiro) = self.kiro_provider() {
+                    kiro.complete_split(
+                        messages,
+                        tools,
+                        system_static,
+                        system_dynamic,
+                        resume_session_id,
+                    )
+                    .await
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Kiro is not available. Run `jcode login --provider kiro`."
                     ))
                 }
             }

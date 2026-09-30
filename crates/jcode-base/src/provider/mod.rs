@@ -14,6 +14,7 @@ mod failover;
 mod fingerprint;
 pub mod gemini;
 pub mod jcode;
+pub mod kiro;
 pub mod models;
 mod multi_provider;
 pub mod openai;
@@ -307,6 +308,8 @@ pub struct MultiProvider {
     cursor: RwLock<Option<Arc<cursor::CursorCliProvider>>>,
     /// AWS Bedrock provider (native Converse/ConverseStream, IAM/SigV4)
     bedrock: RwLock<Option<Arc<bedrock::BedrockProvider>>>,
+    /// Kiro provider (AWS CodeWhisperer streaming API, hot-swappable after login)
+    kiro: RwLock<Option<Arc<kiro::KiroProvider>>>,
     /// OpenRouter API provider
     openrouter: RwLock<Option<Arc<openrouter::OpenRouterProvider>>>,
     /// Direct OpenAI-compatible runtimes keyed by profile id.
@@ -743,6 +746,16 @@ impl MultiProvider {
                 self.set_active_provider(ActiveProvider::Bedrock);
                 Ok(())
             }
+            ActiveProvider::Kiro => {
+                let Some(kiro) = self.kiro_provider() else {
+                    anyhow::bail!(
+                        "Kiro credentials not available. Run `jcode login --provider kiro` first."
+                    );
+                };
+                kiro.set_model(model)?;
+                self.set_active_provider(ActiveProvider::Kiro);
+                Ok(())
+            }
             ActiveProvider::OpenRouter => {
                 self.clear_active_openai_compatible_profile();
                 // Decide whether the slot must be rebound to the real
@@ -1019,6 +1032,17 @@ impl MultiProvider {
                 Some(Arc::new(bedrock::BedrockProvider::new()));
         }
 
+        if let Some(kiro) = self.kiro_provider() {
+            kiro.on_auth_changed();
+        } else if kiro::KiroProvider::has_credentials() {
+            crate::logging::info("Hot-initialized Kiro provider after login");
+            *self
+                .kiro
+                .write()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                Some(Arc::new(kiro::KiroProvider::new()));
+        }
+
         if let Some(anthropic) = self.anthropic_provider() {
             Self::spawn_post_auth_model_refresh(anthropic, "Anthropic");
         }
@@ -1146,6 +1170,7 @@ impl MultiProvider {
             ActiveProvider::Gemini => "gemini",
             ActiveProvider::Cursor => "cursor",
             ActiveProvider::Bedrock => "bedrock",
+            ActiveProvider::Kiro => "kiro",
             ActiveProvider::OpenRouter => {
                 if let Some(openrouter) = self.active_openrouter_execution_provider()
                     && let Some((_provider, api_method, _detail)) =
@@ -1224,6 +1249,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Cursor => "Cursor",
             ActiveProvider::Bedrock => "Bedrock",
             ActiveProvider::OpenRouter => "OpenRouter",
+            ActiveProvider::Kiro => "Kiro",
         }
     }
 
@@ -1276,6 +1302,10 @@ impl Provider for MultiProvider {
                 .bedrock_provider()
                 .map(|o| o.model())
                 .unwrap_or_else(|| "anthropic.claude-3-5-sonnet-20241022-v2:0".to_string()),
+            ActiveProvider::Kiro => self
+                .kiro_provider()
+                .map(|o| o.model())
+                .unwrap_or_else(|| jcode_provider_kiro::DEFAULT_MODEL.to_string()),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.model())
@@ -1374,6 +1404,10 @@ impl Provider for MultiProvider {
                 .unwrap_or(false),
             ActiveProvider::Bedrock => self
                 .bedrock_provider()
+                .map(|provider| provider.supports_image_input())
+                .unwrap_or(false),
+            ActiveProvider::Kiro => self
+                .kiro_provider()
                 .map(|provider| provider.supports_image_input())
                 .unwrap_or(false),
             ActiveProvider::OpenRouter => self
@@ -1536,6 +1570,10 @@ impl Provider for MultiProvider {
                 .bedrock_provider()
                 .map(|bedrock| bedrock.available_models_for_switching())
                 .unwrap_or_default(),
+            ActiveProvider::Kiro => self
+                .kiro_provider()
+                .map(|kiro| kiro.available_models_for_switching())
+                .unwrap_or_else(Vec::new),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|openrouter| openrouter.available_models_for_switching())
@@ -1746,6 +1784,7 @@ impl Provider for MultiProvider {
                 .map(|o| o.handles_tools_internally())
                 .unwrap_or(false),
             ActiveProvider::Bedrock => false, // jcode executes Bedrock tool calls
+            ActiveProvider::Kiro => false,    // jcode executes Kiro tool calls
             ActiveProvider::OpenRouter => false, // jcode executes tools
         }
     }
@@ -1766,6 +1805,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Gemini => None,
             ActiveProvider::Cursor => None,
             ActiveProvider::Bedrock => None,
+            ActiveProvider::Kiro => None,
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .and_then(|o| o.reasoning_effort()),
@@ -1938,6 +1978,10 @@ impl Provider for MultiProvider {
                 .bedrock_provider()
                 .map(|o| o.uses_jcode_compaction())
                 .unwrap_or(false),
+            ActiveProvider::Kiro => self
+                .kiro_provider()
+                .map(|o| o.supports_compaction())
+                .unwrap_or(false),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.supports_compaction())
@@ -1977,6 +2021,10 @@ impl Provider for MultiProvider {
                 .map(|o| o.uses_jcode_compaction())
                 .unwrap_or(false),
             ActiveProvider::Bedrock => false,
+            ActiveProvider::Kiro => self
+                .kiro_provider()
+                .map(|o| o.uses_jcode_compaction())
+                .unwrap_or(false),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.uses_jcode_compaction())
@@ -2073,6 +2121,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Bedrock => Err(anyhow::anyhow!(
                 "AWS Bedrock does not support native compaction"
             )),
+            ActiveProvider::Kiro => Err(anyhow::anyhow!("Kiro does not support native compaction")),
             ActiveProvider::OpenRouter => {
                 let provider = self.active_openrouter_execution_provider();
                 if let Some(openrouter) = provider {
@@ -2148,6 +2197,10 @@ impl Provider for MultiProvider {
                 .bedrock_provider()
                 .map(|o| o.context_window())
                 .unwrap_or(DEFAULT_CONTEXT_LIMIT),
+            ActiveProvider::Kiro => self
+                .kiro_provider()
+                .map(|o| o.context_window())
+                .unwrap_or(DEFAULT_CONTEXT_LIMIT),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
                 .map(|o| o.context_window())
@@ -2208,6 +2261,11 @@ impl Provider for MultiProvider {
         } else {
             None
         };
+        let kiro_provider = if self.kiro_provider().is_some() {
+            Some(Arc::new(kiro::KiroProvider::new()))
+        } else {
+            None
+        };
         let openrouter = if self
             .openrouter
             .read()
@@ -2228,6 +2286,7 @@ impl Provider for MultiProvider {
             gemini: RwLock::new(gemini_provider),
             cursor: RwLock::new(cursor_provider),
             bedrock: RwLock::new(bedrock_provider),
+            kiro: RwLock::new(kiro_provider),
             openrouter: RwLock::new(openrouter),
             openai_compatible_profiles: RwLock::new(HashMap::new()),
             active_openai_compatible_profile: RwLock::new(None),
@@ -2261,6 +2320,7 @@ impl Provider for MultiProvider {
             ActiveProvider::Gemini => None,
             ActiveProvider::Cursor => None,
             ActiveProvider::Bedrock => None,
+            ActiveProvider::Kiro => None,
             ActiveProvider::OpenRouter => None,
         }
     }

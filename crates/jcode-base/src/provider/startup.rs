@@ -105,6 +105,7 @@ impl MultiProvider {
             .assessment_for_provider(crate::provider_catalog::CURSOR_LOGIN_PROVIDER)
             .is_available();
         let has_bedrock_creds = bedrock::BedrockProvider::has_credentials();
+        let has_kiro_creds = kiro::KiroProvider::has_credentials();
         let has_openrouter_creds = openrouter::OpenRouterProvider::has_credentials();
 
         let use_claude_cli = std::env::var("JCODE_USE_CLAUDE_CLI")
@@ -195,6 +196,12 @@ impl MultiProvider {
             None
         };
 
+        let kiro_provider = if has_kiro_creds {
+            Some(Arc::new(kiro::KiroProvider::new()))
+        } else {
+            None
+        };
+
         let openrouter = if has_openrouter_creds {
             let named_profile = std::env::var("JCODE_NAMED_PROVIDER_PROFILE")
                 .ok()
@@ -235,6 +242,7 @@ impl MultiProvider {
             cursor: cursor_provider.is_some(),
             bedrock: bedrock_provider.is_some(),
             openrouter: openrouter.is_some(),
+            kiro: kiro_provider.is_some(),
             copilot_premium_zero,
         };
         let mut active = Self::auto_default_provider(availability);
@@ -289,7 +297,7 @@ impl MultiProvider {
                 }
             } else {
                 crate::logging::warn(&format!(
-                    "Unknown default_provider '{}' in config (expected: claude|openai|copilot|antigravity|gemini|cursor|bedrock|openrouter or an OpenAI-compatible profile such as deepseek|comtegra|zai|openai-compatible)",
+                    "Unknown default_provider '{}' in config (expected: claude|openai|copilot|antigravity|gemini|cursor|bedrock|kiro|openrouter or an OpenAI-compatible profile such as deepseek|comtegra|zai|openai-compatible)",
                     pref
                 ));
             }
@@ -304,6 +312,7 @@ impl MultiProvider {
             gemini: RwLock::new(gemini_provider),
             cursor: RwLock::new(cursor_provider),
             bedrock: RwLock::new(bedrock_provider),
+            kiro: RwLock::new(kiro_provider),
             openrouter: RwLock::new(openrouter),
             openai_compatible_profiles: RwLock::new(HashMap::new()),
             active_openai_compatible_profile: RwLock::new(None),

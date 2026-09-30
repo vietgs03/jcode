@@ -78,6 +78,7 @@ jcode-provider-copilot = { path = "../jcode-provider-copilot" }
 jcode-provider-openai = { path = "../jcode-provider-openai" }
 jcode-provider-openrouter = { path = "../jcode-provider-openrouter" }
 jcode-provider-gemini = { path = "../jcode-provider-gemini" }
+jcode-provider-kiro = { path = "../jcode-provider-kiro" }
 # NOTE: this foundation layer intentionally does NOT depend on any `jcode-tui-*`
 # crate. The two pure-data/string symbols it used to reach for (`ResumeTarget`,
 # `reasoning_line_markup`) were moved to `jcode-session-types` and

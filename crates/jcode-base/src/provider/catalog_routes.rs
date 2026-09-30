@@ -218,6 +218,7 @@ pub(super) fn multiprovider_model_routes(provider: &MultiProvider) -> Vec<ModelR
     append_antigravity_routes(provider, &mut routes);
     append_cursor_routes(provider, &mut routes);
     append_bedrock_routes(provider, &mut routes);
+    append_kiro_routes(provider, &mut routes);
 
     let has_openrouter = provider.openrouter_provider().is_some();
     let has_openrouter_provider_features = provider
@@ -498,6 +499,12 @@ fn append_bedrock_routes(provider: &MultiProvider, routes: &mut Vec<ModelRoute>)
             }
             route
         }));
+    }
+}
+
+fn append_kiro_routes(provider: &MultiProvider, routes: &mut Vec<ModelRoute>) {
+    if let Some(kiro) = provider.kiro_provider() {
+        routes.extend(kiro.model_routes());
     }
 }
 

@@ -46,6 +46,8 @@ pub(crate) enum PendingLogin {
     CursorApiKey,
     /// GitHub Copilot device flow in progress (polling in background)
     Copilot,
+    /// Kiro (AWS Builder ID / IAM Identity Center) device flow in progress
+    Kiro,
     /// Waiting for the user to choose which external auth sources to import.
     AutoImportSelection {
         candidates: Vec<crate::external_auth::ExternalAuthReviewCandidate>,
@@ -85,6 +87,7 @@ impl PendingLogin {
             }
             Self::CursorApiKey => Some(("cursor".to_string(), "api_key".to_string())),
             Self::Copilot => Some(("copilot".to_string(), "device_code".to_string())),
+            Self::Kiro => Some(("kiro".to_string(), "device_code".to_string())),
             Self::AutoImportSelection { .. } => None,
             Self::AzureEndpoint | Self::AzureModel { .. } | Self::AzureAuthChoice { .. } => {
                 Some(("azure".to_string(), "hybrid".to_string()))

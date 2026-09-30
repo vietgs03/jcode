@@ -67,6 +67,7 @@ pub fn runtime_id_for_login_provider(
         LoginProviderTarget::Copilot => Some(RuntimeProviderId::Copilot),
         LoginProviderTarget::Gemini => Some(RuntimeProviderId::Gemini),
         LoginProviderTarget::Antigravity => Some(RuntimeProviderId::Antigravity),
+        LoginProviderTarget::Kiro => Some(RuntimeProviderId::Kiro),
         // Google/Gmail auth is for tool access, not model-runtime routing.
         LoginProviderTarget::Google => None,
     }

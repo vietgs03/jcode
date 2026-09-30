@@ -57,6 +57,13 @@ impl MultiProvider {
             .clone()
     }
 
+    pub(super) fn kiro_provider(&self) -> Option<Arc<kiro::KiroProvider>> {
+        self.kiro
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
     pub(super) fn openrouter_provider(&self) -> Option<Arc<openrouter::OpenRouterProvider>> {
         ProviderRegistry::new(self).real_openrouter()
     }
@@ -84,6 +91,7 @@ impl MultiProvider {
             ActiveProvider::Gemini => self.gemini_provider().is_some(),
             ActiveProvider::Cursor => self.cursor_provider().is_some(),
             ActiveProvider::Bedrock => self.bedrock_provider().is_some(),
+            ActiveProvider::Kiro => self.kiro_provider().is_some(),
             // The OpenRouter slot executes through the *active* runtime: a
             // direct OpenAI-compatible profile when one is active, else real
             // OpenRouter. Checking only the real slot here made dispatch treat

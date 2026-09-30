@@ -583,6 +583,7 @@ pub(super) fn list_cli_providers() -> Vec<ProviderListEntry> {
         ProviderChoice::Copilot,
         ProviderChoice::Gemini,
         ProviderChoice::Antigravity,
+        ProviderChoice::Kiro,
         ProviderChoice::Google,
         ProviderChoice::Auto,
     ];

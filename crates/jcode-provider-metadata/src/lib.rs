@@ -37,6 +37,7 @@ pub enum LoginProviderTarget {
     Copilot,
     Gemini,
     Antigravity,
+    Kiro,
     Google,
 }
 
@@ -53,6 +54,7 @@ pub enum LoginProviderAuthStateKey {
     Gemini,
     Antigravity,
     Cursor,
+    Kiro,
     Google,
 }
 

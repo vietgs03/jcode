@@ -11,6 +11,7 @@ use crate::provider_catalog::{
 
 use super::provider_init::{ProviderChoice, login_provider_for_choice, save_named_api_key};
 
+mod kiro;
 mod scriptable;
 use scriptable::*;
 
@@ -303,6 +304,9 @@ pub async fn run_login_provider(
                 .await
                 .map(|_| LoginFlowOutcome::Completed),
             LoginProviderTarget::Antigravity => login_antigravity_flow(options.no_browser)
+                .await
+                .map(|_| LoginFlowOutcome::Completed),
+            LoginProviderTarget::Kiro => kiro::login_kiro_flow(options.no_browser)
                 .await
                 .map(|_| LoginFlowOutcome::Completed),
             LoginProviderTarget::Google => {

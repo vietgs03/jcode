@@ -120,6 +120,7 @@ pub enum ProviderChoice {
     )]
     GeminiApi,
     Antigravity,
+    Kiro,
     Google,
     Auto,
 }
@@ -174,6 +175,7 @@ impl ProviderChoice {
             Self::Gemini => "gemini",
             Self::GeminiApi => "gemini-api",
             Self::Antigravity => "antigravity",
+            Self::Kiro => "kiro",
             Self::Google => "google",
             Self::Auto => "auto",
         }
@@ -365,6 +367,10 @@ const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescripto
     (
         ProviderChoice::Antigravity,
         crate::provider_catalog::ANTIGRAVITY_LOGIN_PROVIDER,
+    ),
+    (
+        ProviderChoice::Kiro,
+        crate::provider_catalog::KIRO_LOGIN_PROVIDER,
     ),
     (
         ProviderChoice::Google,
@@ -569,6 +575,7 @@ struct AutoProviderAvailability {
     has_gemini: bool,
     has_cursor: bool,
     has_openrouter: bool,
+    has_kiro: bool,
 }
 
 impl AutoProviderAvailability {
@@ -580,6 +587,7 @@ impl AutoProviderAvailability {
             || self.has_gemini
             || self.has_cursor
             || self.has_openrouter
+            || self.has_kiro
     }
 }
 
@@ -623,6 +631,7 @@ async fn detect_auto_provider_flags() -> AutoProviderAvailability {
         has_gemini: auth_status.gemini == auth::AuthState::Available,
         has_cursor: auth_status.cursor == auth::AuthState::Available,
         has_openrouter: auth_status.openrouter == auth::AuthState::Available,
+        has_kiro: auth::kiro::has_credentials(),
         auth_status,
     }
 }
@@ -1296,6 +1305,11 @@ pub async fn login_and_bootstrap_provider(
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "antigravity");
             Arc::new(provider::antigravity::AntigravityProvider::new())
         }
+        LoginProviderTarget::Kiro => {
+            disable_subscription_runtime_mode();
+            lock_model_provider("kiro");
+            Arc::new(provider::MultiProvider::new())
+        }
         LoginProviderTarget::Google => {
             anyhow::bail!("Google login cannot be used as a model provider bootstrap");
         }
@@ -1459,6 +1473,12 @@ async fn init_provider_with_options(
             lock_model_provider("bedrock");
             Arc::new(provider::MultiProvider::new_fast())
         }
+        ProviderChoice::Kiro => {
+            disable_subscription_runtime_mode();
+            init_notice("Using Kiro provider (AWS CodeWhisperer API, provider locked)");
+            lock_model_provider("kiro");
+            Arc::new(provider::MultiProvider::new_fast())
+        }
         ProviderChoice::Azure => {
             disable_subscription_runtime_mode();
             let model = crate::provider::activation::apply_azure_openai_runtime()?;
@@ -1592,6 +1612,7 @@ async fn init_provider_with_options(
                 let mut has_openai = availability.has_openai;
                 let mut has_copilot = availability.has_copilot;
                 let has_antigravity = availability.has_antigravity;
+                let has_kiro = availability.has_kiro;
                 let mut has_gemini = availability.has_gemini;
                 let mut has_cursor = availability.has_cursor;
                 let mut has_openrouter = availability.has_openrouter;
@@ -1681,6 +1702,7 @@ async fn init_provider_with_options(
                     has_gemini,
                     has_cursor,
                     has_openrouter,
+                    has_kiro,
                 };
                 crate::logging::info(&format!(
                     "[TIMING] auto_provider_bootstrap: detect={}ms, external_import={}, supplemental={}ms, final_has_any={}",

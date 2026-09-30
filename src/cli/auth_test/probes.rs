@@ -25,6 +25,9 @@ fn generic_credential_paths_for_provider(
             let resolved = crate::provider_catalog::resolve_openai_compatible_profile(profile);
             vec![config_dir.join(resolved.env_file)]
         }
+        crate::provider_catalog::LoginProviderTarget::Kiro => {
+            crate::auth::kiro::tokens_path().into_iter().collect()
+        }
         _ => Vec::new(),
     }
     .into_iter()

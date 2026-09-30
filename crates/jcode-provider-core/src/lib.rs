@@ -560,6 +560,7 @@ pub enum RuntimeKey {
     Cursor,
     Bedrock,
     Antigravity,
+    Kiro,
     CodeAssistOAuth,
     RemoteCatalog,
     Current,
@@ -580,6 +581,7 @@ impl RuntimeKey {
             ModelRouteApiMethod::Copilot => Self::Copilot,
             ModelRouteApiMethod::Cursor => Self::Cursor,
             ModelRouteApiMethod::Bedrock => Self::Bedrock,
+            ModelRouteApiMethod::Kiro => Self::Kiro,
             ModelRouteApiMethod::CodeAssistOAuth => Self::CodeAssistOAuth,
             ModelRouteApiMethod::AntigravityHttps => Self::Antigravity,
             ModelRouteApiMethod::RemoteCatalog => Self::RemoteCatalog,
@@ -604,6 +606,7 @@ impl RuntimeKey {
             Self::Cursor => "cursor".to_string(),
             Self::Bedrock => "bedrock".to_string(),
             Self::Antigravity => "antigravity".to_string(),
+            Self::Kiro => "kiro".to_string(),
             Self::CodeAssistOAuth => "code-assist-oauth".to_string(),
             Self::RemoteCatalog => "remote-catalog".to_string(),
             Self::Current => "current".to_string(),
@@ -675,6 +678,7 @@ impl RouteSelection {
             RuntimeKey::Cursor => format!("cursor:{model}"),
             RuntimeKey::Bedrock => format!("bedrock:{model}"),
             RuntimeKey::Antigravity => format!("antigravity:{model}"),
+            RuntimeKey::Kiro => format!("kiro:{model}"),
             RuntimeKey::Gemini
             | RuntimeKey::CodeAssistOAuth
             | RuntimeKey::RemoteCatalog
@@ -713,6 +717,7 @@ pub enum ModelRouteApiMethod {
     Copilot,
     Cursor,
     Bedrock,
+    Kiro,
     CodeAssistOAuth,
     AntigravityHttps,
     RemoteCatalog,
@@ -747,6 +752,7 @@ impl ModelRouteApiMethod {
             "copilot" => Self::Copilot,
             "cursor" => Self::Cursor,
             "bedrock" => Self::Bedrock,
+            "kiro" => Self::Kiro,
             "code-assist-oauth" => Self::CodeAssistOAuth,
             "https" => Self::AntigravityHttps,
             "remote-catalog" => Self::RemoteCatalog,
@@ -793,6 +799,10 @@ impl ModelRouteApiMethod {
         matches!(self, Self::Bedrock)
     }
 
+    pub fn is_kiro(&self) -> bool {
+        matches!(self, Self::Kiro)
+    }
+
     pub fn matches_openai_compatible_profile(&self, provider_id: &str) -> bool {
         self.profile_id()
             .is_some_and(|profile_id| profile_id.eq_ignore_ascii_case(provider_id))
@@ -816,6 +826,7 @@ impl ModelRouteApiMethod {
             Self::Copilot => "copilot".to_string(),
             Self::Cursor => "cursor".to_string(),
             Self::Bedrock => "bedrock".to_string(),
+            Self::Kiro => "kiro".to_string(),
             Self::AntigravityHttps => "https".to_string(),
             Self::RemoteCatalog => "remote-catalog".to_string(),
             Self::Current => "current".to_string(),
@@ -857,6 +868,7 @@ pub fn model_route_provider_labels_match(route_provider: &str, current_provider:
             )
             | ("cursor", "cursor")
             | ("bedrock" | "awsbedrock", "bedrock" | "awsbedrock")
+            | ("kiro", "kiro")
             | ("openrouter", "openrouter" | "auto")
     )
 }

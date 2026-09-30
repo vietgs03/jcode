@@ -3236,6 +3236,7 @@ fn filter_cli_model_routes_for_choice(
             route.api_method_kind().is_openrouter()
         }
         ProviderChoice::Copilot => route.api_method_kind().is_copilot(),
+        ProviderChoice::Kiro => route.api_method_kind().is_kiro(),
         _ => true,
     };
 

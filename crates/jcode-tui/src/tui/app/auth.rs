@@ -2,6 +2,8 @@
 mod auth_account_commands;
 #[path = "auth_account_picker.rs"]
 mod auth_account_picker;
+#[path = "auth_kiro.rs"]
+mod auth_kiro;
 #[path = "auth_types.rs"]
 mod auth_types;
 pub(crate) use self::auth_account_commands::{
@@ -275,6 +277,10 @@ impl App {
                 crate::auth::gemini::clear_tokens()?;
                 Ok("Logged out of Gemini.".to_string())
             }
+            LoginProviderTarget::Kiro => {
+                crate::auth::kiro::clear_tokens()?;
+                Ok("Logged out of Kiro.".to_string())
+            }
             _ => Ok(format!(
                 "Logout for {} is not automated yet. Remove its saved API key or external CLI session from /account {} settings.",
                 provider.display_name, provider.id
@@ -502,6 +508,7 @@ impl App {
             crate::provider_catalog::LoginProviderTarget::Antigravity => {
                 self.start_antigravity_login()
             }
+            crate::provider_catalog::LoginProviderTarget::Kiro => self.start_kiro_login(),
             crate::provider_catalog::LoginProviderTarget::Google => {
                 crate::telemetry::record_auth_surface_blocked(
                     provider.id,
@@ -2264,6 +2271,14 @@ impl App {
                 ));
                 self.pending_login = Some(PendingLogin::Copilot);
             }
+            PendingLogin::Kiro => {
+                self.push_display_message(DisplayMessage::system(
+                    "Kiro login is waiting for browser authorization.\n\
+                     Complete the sign-in in your browser, or type /cancel to abort."
+                        .to_string(),
+                ));
+                self.pending_login = Some(PendingLogin::Kiro);
+            }
             PendingLogin::AutoImportSelection { candidates } => {
                 let selected = match crate::external_auth::parse_external_auth_review_selection(
                     &input,
@@ -2613,7 +2628,7 @@ impl App {
     }
 
     pub(super) fn handle_login_completed(&mut self, login: LoginCompleted) {
-        if login.provider == "copilot_code" {
+        if login.provider == "copilot_code" || login.provider == "kiro_code" {
             self.push_display_message(DisplayMessage::system(login.message.clone()));
             if let Some(code) = login
                 .message
@@ -2621,7 +2636,12 @@ impl App {
                 .nth(1)
                 .and_then(|s| s.split_whitespace().next())
             {
-                self.set_status_notice(format!("Login: enter {} at GitHub", code));
+                let site = if login.provider == "kiro_code" {
+                    "AWS"
+                } else {
+                    "GitHub"
+                };
+                self.set_status_notice(format!("Login: enter {} at {}", code, site));
             }
             return;
         }
@@ -2649,8 +2669,8 @@ impl App {
         if login.success {
             self.recent_authenticated_provider = Some((login.provider.clone(), Instant::now()));
             self.invalidate_model_picker_cache();
-            let suppress_first_run_login_noise =
-                self.onboarding_flow_active() && !matches!(login.provider.as_str(), "copilot_code");
+            let suppress_first_run_login_noise = self.onboarding_flow_active()
+                && !matches!(login.provider.as_str(), "copilot_code" | "kiro_code");
             if !suppress_first_run_login_noise {
                 self.push_display_message(DisplayMessage::system(login.message));
             }

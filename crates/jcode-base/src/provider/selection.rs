@@ -93,6 +93,7 @@ impl MultiProvider {
             LoginProviderTarget::Copilot => Some("copilot"),
             LoginProviderTarget::Gemini => Some("gemini"),
             LoginProviderTarget::Antigravity => Some("antigravity"),
+            LoginProviderTarget::Kiro => Some("kiro"),
             LoginProviderTarget::AutoImport
             | LoginProviderTarget::Jcode
             | LoginProviderTarget::Azure
@@ -147,6 +148,7 @@ impl MultiProvider {
             }
             ModelRouteApiMethod::Cursor => format!("cursor:{}", bare_name),
             ModelRouteApiMethod::Bedrock => format!("bedrock:{}", bare_name),
+            ModelRouteApiMethod::Kiro => format!("kiro:{}", bare_name),
             ModelRouteApiMethod::OpenAIApiKey => format!("openai-api:{}", bare_name),
             ModelRouteApiMethod::OpenAIOAuth => format!("openai-oauth:{}", bare_name),
             _ if provider_display == "Antigravity" => format!("antigravity:{}", bare_name),
@@ -176,6 +178,7 @@ impl MultiProvider {
             ModelRouteApiMethod::Copilot => Some("copilot".to_string()),
             ModelRouteApiMethod::Cursor => Some("cursor".to_string()),
             ModelRouteApiMethod::Bedrock => Some("bedrock".to_string()),
+            ModelRouteApiMethod::Kiro => Some("kiro".to_string()),
             ModelRouteApiMethod::Other(method)
                 if method == "cli" && provider_display == "Antigravity" =>
             {
@@ -231,7 +234,8 @@ impl MultiProvider {
                     return Some(route.session_provider_key().to_string());
                 }
                 match prefix {
-                    "copilot" | "antigravity" | "gemini" | "cursor" | "bedrock" | "openrouter" => {
+                    "copilot" | "antigravity" | "gemini" | "cursor" | "bedrock" | "kiro"
+                    | "openrouter" => {
                         return Some(prefix.to_string());
                     }
                     _ => {
@@ -307,6 +311,7 @@ impl MultiProvider {
             "gemini" | "google" => "gemini",
             "antigravity" => "antigravity",
             "bedrock" | "aws bedrock" => "bedrock",
+            "kiro" => "kiro",
             "" => return None,
             _ => return None,
         };
@@ -382,7 +387,7 @@ impl MultiProvider {
         }
 
         match provider_key {
-            "copilot" | "antigravity" | "gemini" | "cursor" | "bedrock" | "openrouter" => {
+            "copilot" | "antigravity" | "gemini" | "cursor" | "bedrock" | "kiro" | "openrouter" => {
                 format!("{provider_key}:{model}")
             }
             _ => {
@@ -425,6 +430,7 @@ impl MultiProvider {
                 ModelRouteApiMethod::Copilot => return format!("copilot:{model}"),
                 ModelRouteApiMethod::Cursor => return format!("cursor:{model}"),
                 ModelRouteApiMethod::Bedrock => return format!("bedrock:{model}"),
+                ModelRouteApiMethod::Kiro => return format!("kiro:{model}"),
                 ModelRouteApiMethod::AntigravityHttps => return format!("antigravity:{model}"),
                 ModelRouteApiMethod::OpenAiCompatible { profile_id: None }
                 | ModelRouteApiMethod::CodeAssistOAuth

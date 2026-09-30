@@ -477,7 +477,8 @@ pub(super) async fn handle_bus_event(
             true
         }
         Ok(BusEvent::LoginCompleted(login)) => {
-            let success = login.success && login.provider != "copilot_code";
+            let success =
+                login.success && !matches!(login.provider.as_str(), "copilot_code" | "kiro_code");
             let provider_hint = auth_provider_hint_for_login_provider(&login.provider);
             let auth = auth_changed_event_for_login_provider(&login.provider);
             app.handle_login_completed(login);

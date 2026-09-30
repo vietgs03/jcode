@@ -46,6 +46,8 @@ pub struct AuthStatus {
     pub gemini: AuthState,
     /// Cursor provider configured via Cursor Agent plus API key or CLI session
     pub cursor: AuthState,
+    /// Kiro login (AWS Builder ID / IAM Identity Center / imported Kiro IDE)
+    pub kiro: AuthState,
     /// Google/Gmail OAuth configured
     pub google: AuthState,
     /// Google Gmail has send capability (Full tier)

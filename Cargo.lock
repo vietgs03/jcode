@@ -3547,6 +3547,7 @@ dependencies = [
  "jcode-provider-core",
  "jcode-provider-env",
  "jcode-provider-gemini",
+ "jcode-provider-kiro",
  "jcode-provider-metadata",
  "jcode-provider-openai",
  "jcode-provider-openrouter",

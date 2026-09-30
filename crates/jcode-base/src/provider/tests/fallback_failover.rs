@@ -184,6 +184,7 @@ fn test_set_model_rejects_cross_provider_without_creds() {
         gemini: RwLock::new(None),
         cursor: RwLock::new(None),
         bedrock: RwLock::new(None),
+        kiro: RwLock::new(None),
         openrouter: RwLock::new(None),
         openai_compatible_profiles: RwLock::new(std::collections::HashMap::new()),
         active_openai_compatible_profile: RwLock::new(None),
@@ -214,6 +215,7 @@ fn test_auto_default_prefers_openai_over_claude_when_both_available() {
         cursor: false,
         bedrock: false,
         openrouter: false,
+        kiro: false,
         copilot_premium_zero: false,
     });
     assert_eq!(active, ActiveProvider::OpenAI);
@@ -230,6 +232,7 @@ fn test_auto_default_prefers_copilot_when_zero_premium_mode_enabled() {
         cursor: true,
         bedrock: false,
         openrouter: true,
+        kiro: false,
         copilot_premium_zero: true,
     });
     assert_eq!(active, ActiveProvider::Copilot);
@@ -299,6 +302,7 @@ fn test_no_provider_error_mentions_tokens_and_details() {
         gemini: RwLock::new(None),
         cursor: RwLock::new(None),
         bedrock: RwLock::new(None),
+        kiro: RwLock::new(None),
         openrouter: RwLock::new(None),
         openai_compatible_profiles: RwLock::new(std::collections::HashMap::new()),
         active_openai_compatible_profile: RwLock::new(None),
@@ -337,6 +341,7 @@ fn test_active_compat_profile_counts_as_configured_openrouter_slot() {
                 gemini: RwLock::new(None),
                 cursor: RwLock::new(None),
                 bedrock: RwLock::new(None),
+                kiro: RwLock::new(None),
                 openrouter: RwLock::new(None),
                 openai_compatible_profiles: RwLock::new(std::collections::HashMap::new()),
                 active_openai_compatible_profile: RwLock::new(None),

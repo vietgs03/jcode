@@ -722,6 +722,7 @@ fn normalized_login_provider_id(provider_id: &str) -> Option<&'static str> {
         "copilot" => Some("copilot"),
         "gemini" => Some("gemini"),
         "antigravity" => Some("antigravity"),
+        "kiro" => Some("kiro"),
         _ => None,
     }
 }
@@ -869,6 +870,10 @@ fn direct_provider_activation(provider_id: &str) -> Option<ProviderActivation> {
             RuntimeProviderId::Antigravity,
             ActiveProvider::Antigravity,
         )),
+        "kiro" => Some(ProviderActivation::locked(
+            RuntimeProviderId::Kiro,
+            ActiveProvider::Kiro,
+        )),
         _ => None,
     }
 }
@@ -897,6 +902,7 @@ pub fn model_switch_request_for_provider_id(
         Some("copilot") => format!("copilot:{}", model),
         Some("gemini") => format!("gemini:{}", model),
         Some("antigravity") => format!("antigravity:{}", model),
+        Some("kiro") => format!("kiro:{}", model),
         _ => model.to_string(),
     }
 }

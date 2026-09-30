@@ -13,6 +13,7 @@ pub mod gemini;
 pub mod google;
 pub(crate) mod google_oauth;
 pub mod integration;
+pub mod kiro;
 pub mod lifecycle;
 #[cfg(any(test, feature = "test-support"))]
 // The driver's items are exercised by its internal #[cfg(test)] tests; under
@@ -166,6 +167,7 @@ fn log_auth_status_snapshot(event: &str, status: &AuthStatus) {
             ("antigravity", auth_state_label(status.antigravity)),
             ("gemini", auth_state_label(status.gemini)),
             ("cursor", auth_state_label(status.cursor)),
+            ("kiro", auth_state_label(status.kiro)),
             ("google", auth_state_label(status.google)),
         ],
     );
@@ -196,6 +198,7 @@ fn available_provider_base_readiness(provider: LoginProviderDescriptor) -> AuthR
         | crate::provider_catalog::LoginProviderTarget::Copilot
         | crate::provider_catalog::LoginProviderTarget::Gemini
         | crate::provider_catalog::LoginProviderTarget::Antigravity
+        | crate::provider_catalog::LoginProviderTarget::Kiro
         | crate::provider_catalog::LoginProviderTarget::Google => AuthReadinessLevel::Authenticated,
         _ => AuthReadinessLevel::CredentialPresent,
     }
@@ -292,6 +295,7 @@ impl AuthStatus {
             || self.antigravity == AuthState::Available
             || self.gemini == AuthState::Available
             || self.cursor == AuthState::Available
+            || self.kiro == AuthState::Available
     }
 
     /// Emit a structured, non-secret snapshot of which providers currently have
@@ -327,6 +331,7 @@ impl AuthStatus {
                 ("antigravity", self.antigravity.label().to_string()),
                 ("gemini", self.gemini.label().to_string()),
                 ("cursor", self.cursor.label().to_string()),
+                ("kiro", self.kiro.label().to_string()),
             ],
         );
     }
@@ -359,6 +364,7 @@ impl AuthStatus {
             LoginProviderAuthStateKey::Antigravity => self.antigravity,
             LoginProviderAuthStateKey::Gemini => self.gemini,
             LoginProviderAuthStateKey::Cursor => self.cursor,
+            LoginProviderAuthStateKey::Kiro => self.kiro,
             LoginProviderAuthStateKey::Google => self.google,
         }
     }
@@ -830,6 +836,7 @@ fn build_auth_status_uncached(mode: AuthProbeMode) -> (AuthStatus, Vec<(&'static
     record_auth_probe_step(&mut timings, "cursor", || {
         probe_cursor_status(&mut status, mode)
     });
+    record_auth_probe_step(&mut timings, "kiro", || status.kiro = kiro::auth_state());
     record_auth_probe_step(&mut timings, "google", || probe_google_status(&mut status));
 
     (status, timings)
@@ -1110,6 +1117,20 @@ fn assessment_for_key(
                 AuthValidationMethod::CompositeProbe,
             )
         }
+        LoginProviderAuthStateKey::Kiro => {
+            let (source, detail) = summarize_sources(vec![kiro_source()]);
+            (
+                source,
+                detail,
+                if state == AuthState::NotConfigured {
+                    AuthExpiryConfidence::Unknown
+                } else {
+                    AuthExpiryConfidence::Exact
+                },
+                AuthRefreshSupport::Automatic,
+                AuthValidationMethod::TimestampCheck,
+            )
+        }
         LoginProviderAuthStateKey::Google => {
             let (source, detail) = summarize_sources(vec![google_source()]);
             (
@@ -1312,6 +1333,16 @@ fn antigravity_source() -> Option<(AuthCredentialSource, String)> {
             "trusted external auth import".to_string(),
         )
     })
+}
+
+fn kiro_source() -> Option<(AuthCredentialSource, String)> {
+    let (Ok(tokens), Ok(path)) = (kiro::load_tokens(), kiro::tokens_path()) else {
+        return None;
+    };
+    Some((
+        AuthCredentialSource::JcodeManagedFile,
+        format!("{} ({})", path.display(), tokens.describe()),
+    ))
 }
 
 fn google_source() -> Option<(AuthCredentialSource, String)> {
