@@ -1079,7 +1079,7 @@ pub const KIRO_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor
     auth_state_key: LoginProviderAuthStateKey::Kiro,
     auth_status_method: "AWS Builder ID / IAM Identity Center",
     aliases: &[],
-    menu_detail: "AWS Builder ID / IAM Identity Center device flow, or import a Kiro IDE login",
+    menu_detail: "AWS Builder ID / Identity Center device flow",
     recommended: false,
     target: LoginProviderTarget::Kiro,
     order: LoginProviderSurfaceOrder::new(Some(40), Some(40), None, None, Some(40)),

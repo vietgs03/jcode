@@ -65,7 +65,7 @@ fn prompt_identity_center() -> Result<KiroLoginTarget> {
         "Identity Center region [{}]: ",
         auth::kiro::DEFAULT_REGION
     ))?;
-    KiroLoginTarget::identity_center(&start_url, Some(&region))
+    KiroLoginTarget::identity_center(&start_url, Some(region.as_str()))
 }
 
 async fn login_with_device_flow(target: KiroLoginTarget, no_browser: bool) -> Result<()> {
