@@ -50,6 +50,7 @@ members = [
     "crates/jcode-provider-openrouter",
     "crates/jcode-provider-openai",
     "crates/jcode-provider-gemini",
+    "crates/jcode-provider-kiro",
     "crates/jcode-tui-markdown",
     "crates/jcode-tui-messages",
     "crates/jcode-usage-types",

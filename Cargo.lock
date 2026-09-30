@@ -3917,6 +3917,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jcode-provider-kiro"
+version = "0.1.0"
+dependencies = [
+ "jcode-message-types",
+ "serde_json",
+]
+
+[[package]]
 name = "jcode-provider-metadata"
 version = "0.1.0"
 dependencies = [
