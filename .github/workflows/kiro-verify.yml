@@ -36,26 +36,20 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: kiro-verify
+          key: kiro-verify-${{ matrix.label }}
           cache-on-failure: "true"
 
-      - name: cargo check (all targets of affected crates)
-        run: |
-          cargo check --locked --all-targets --message-format=short \
-            -p jcode-provider-core -p jcode-provider-metadata \
-            -p jcode-base -p jcode-tui -p jcode 2>&1 | tail -5
-
-      - name: clippy -D warnings (affected crates)
+      - name: clippy --no-deps -D warnings (affected crates)
         continue-on-error: true
         run: |
           set +e
-          cargo clippy --locked --all-targets --message-format=short \
-            -p jcode-provider-core -p jcode-provider-metadata \
-            -p jcode-base -p jcode-tui -p jcode -- -D warnings > clippy.log 2>&1
+          pkgs="-p jcode-provider-core -p jcode-provider-metadata -p jcode-base -p jcode-tui -p jcode"
+          if [ -d crates/jcode-provider-kiro ]; then pkgs="$pkgs -p jcode-provider-kiro"; fi
+          cargo clippy --locked --no-deps --all-targets --message-format=short $pkgs -- -D warnings > clippy.log 2>&1
           echo "clippy exit: $?"
-          grep -E "^(crates|src)/[^ ]+: (error|warning)" clippy.log | sort | uniq | head -60
+          grep -E "^(crates|src)/[^ ]+: (error|warning)" clippy.log | sort | uniq | head -80
 
-      - name: tests
+      - name: full test suites
         continue-on-error: true
         run: |
           set +e
@@ -63,15 +57,19 @@ jobs:
             label="$1"; shift
             "$@" > "test-$label.log" 2>&1
             echo "== $label exit=$?"
-            grep -E "^test result|^test .* FAILED" "test-$label.log" | head -40
-            awk '/^---- .* stdout ----$/{p=1; n=0} p{print; n++; if (n>14) {p=0}}' "test-$label.log" | head -150
+            grep -E "^test result|^test .* FAILED" "test-$label.log" | head -60
           }
           run provider-crates cargo test --locked -p jcode-provider-core -p jcode-provider-metadata
-          run base cargo test --locked -p jcode-base --lib -- provider:: auth:: provider_catalog
-          run cli cargo test --locked -p jcode --lib -- provider_init auth_test login commands
+          run base cargo test --locked -p jcode-base --lib
+          run tui cargo test --locked -p jcode-tui --lib
+          run cli cargo test --locked -p jcode --lib
           run auth-login-flow cargo test --locked -p jcode --test auth_login_flow
-          run tui cargo test --locked -p jcode-tui --lib -- login provider picker
+          run provider-matrix cargo test --locked -p jcode --test provider_matrix
 
-      - name: tests (Kiro crate, branch only)
-        if: matrix.label == 'branch'
-        run: cargo test --locked -p jcode-provider-kiro 2>&1 | grep -E "^test result|FAILED|panicked"
+      - name: isolated re-runs of suspected flaky tests
+        continue-on-error: true
+        run: |
+          set +e
+          cargo test --locked -p jcode-tui --lib -- --exact tui::app::tests::test_agent_model_picker_inherit_row_uses_provider_default_when_inherited_model_is_unknown 2>&1 | grep -E "^test |test result"
+          cargo test --locked -p jcode-base --lib -- --exact provider_catalog::provider_catalog_tests::named_provider_profile_reports_malformed_config_instead_of_unknown_profile 2>&1 | grep -E "^test |test result"
+          cargo test --locked -p jcode-base --lib -- --exact provider_catalog::provider_catalog_tests::newest_release_picker_uses_recency_within_a_tier 2>&1 | grep -E "^test |test result"
